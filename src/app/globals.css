@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f6f7f9;
+  --card: #ffffff;
+  --border: #e6e9ee;
+
+  --text-primary: #101828;
+  --text-secondary: #5b6474;
+  --text-tertiary: #475467;
+
+  --accent: #0b7a83;
+
+  --cluster-upstream: #2f62d8;
+  --cluster-midriver: #15845a;
+  --cluster-downstream: #d26a12;
+  --cluster-urban: #7a48d6;
+
+  --status-normal-fg: #067647;
+  --status-normal-bg: #dcfae6;
+  --status-warning-fg: #b54708;
+  --status-warning-bg: #fef0c7;
+  --status-danger-fg: #b42318;
+  --status-danger-bg: #fee4e2;
+
+  --sidebar-active-bg: #e8f3f4;
+  --sidebar-active-fg: #0b6a72;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-card: var(--card);
+  --color-border: var(--border);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+
+  --color-accent: var(--accent);
+
+  --color-cluster-upstream: var(--cluster-upstream);
+  --color-cluster-midriver: var(--cluster-midriver);
+  --color-cluster-downstream: var(--cluster-downstream);
+  --color-cluster-urban: var(--cluster-urban);
+
+  --color-status-normal-fg: var(--status-normal-fg);
+  --color-status-normal-bg: var(--status-normal-bg);
+  --color-status-warning-fg: var(--status-warning-fg);
+  --color-status-warning-bg: var(--status-warning-bg);
+  --color-status-danger-fg: var(--status-danger-fg);
+  --color-status-danger-bg: var(--status-danger-bg);
+
+  --color-sidebar-active-bg: var(--sidebar-active-bg);
+  --color-sidebar-active-fg: var(--sidebar-active-fg);
+
+  --font-sans: var(--font-jakarta);
+  --font-mono: var(--font-plex-mono);
+
+  --radius-card: 14px;
+}
+
+body {
+  background: var(--background);
+  color: var(--text-primary);
+  font-family: var(--font-jakarta), sans-serif;
+}
