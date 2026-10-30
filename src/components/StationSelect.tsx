@@ -14,11 +14,11 @@ export default function StationSelect({
   placeholder?: string;
 }) {
   return (
-    <div className="relative inline-block">
+    <div className="relative inline-block max-w-full">
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="appearance-none rounded-full border border-border bg-card py-2 pl-4 pr-10 text-sm font-medium text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/30"
+        className="w-full max-w-full appearance-none truncate rounded-full border border-border bg-card py-2 pl-4 pr-10 text-sm font-medium text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/30"
       >
         {placeholder && <option value="">{placeholder}</option>}
         {stations.map((s) => (

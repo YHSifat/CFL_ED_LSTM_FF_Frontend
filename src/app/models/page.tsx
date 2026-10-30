@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FEATURES } from "@/lib/features";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { PageSkeleton } from "@/components/Skeleton";
 import ModelComparisonChart from "@/components/ModelComparisonChart";
 import ModelMetricsTable from "@/components/ModelMetricsTable";
 import ModelMetricsBarChart from "@/components/ModelMetricsBarChart";
@@ -34,7 +35,7 @@ function ModelsContent() {
   const series = getModelComparisonSeries(station, EVAL_HORIZON);
 
   return (
-    <div className="flex flex-col gap-5 p-6">
+    <div className="flex flex-col gap-5 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Link href="/" className="text-xs font-medium text-text-secondary hover:text-accent">
@@ -83,7 +84,7 @@ export default function ModelsPage() {
     );
   }
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-text-secondary">Loading…</div>}>
+    <Suspense fallback={<PageSkeleton />}>
       <ModelsContent />
     </Suspense>
   );

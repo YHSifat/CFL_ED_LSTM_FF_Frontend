@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import Skeleton, { PageSkeleton } from "@/components/Skeleton";
 import ObservedPredictedChart from "@/components/ObservedPredictedChart";
 import HorizonSelect from "@/components/HorizonSelect";
 import KpiCard from "@/components/KpiCard";
@@ -60,7 +61,7 @@ function ForecastContent() {
   }
 
   return (
-    <div className="flex flex-col gap-5 p-6">
+    <div className="flex flex-col gap-5 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Link href="/" className="text-xs font-medium text-text-secondary hover:text-accent">
@@ -105,12 +106,14 @@ function ForecastContent() {
       <div className="flex flex-wrap gap-3">
         <KpiCard
           label="Current WL"
+          loading={detail.state === "loading"}
           value={current ? current.wl.toFixed(2) : "–"}
           unit="m"
           sub={current && <span className="text-xs text-text-tertiary">{formatTime(current.time)}</span>}
         />
         <KpiCard
           label="Previous day WL"
+          loading={detail.state === "loading"}
           value={previous ? previous.wl.toFixed(2) : "–"}
           unit="m"
           sub={previous && <span className="text-xs text-text-tertiary">{formatTime(previous.time)}</span>}
@@ -120,10 +123,17 @@ function ForecastContent() {
           value={dangerLevel.toFixed(2)}
           unit="m"
           valueColor="var(--status-danger-fg)"
-          sub={statusMap.state === "ready" && <StatusPill status={toStatus(live)} />}
+          sub={
+            statusMap.state === "loading" ? (
+              <Skeleton className="h-6 w-20 rounded-full" />
+            ) : (
+              statusMap.state === "ready" && <StatusPill status={toStatus(live)} />
+            )
+          }
         />
         <KpiCard
           label={`Predicted WL (${horizon})`}
+          loading={detail.state === "loading"}
           value={forecast ? forecast.wl.toFixed(2) : "–"}
           unit="m"
           sub={
@@ -209,7 +219,7 @@ function DeltaLabel({ delta, onAccent = false }: { delta: number; onAccent?: boo
 
 export default function ForecastPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-text-secondary">Loading…</div>}>
+    <Suspense fallback={<PageSkeleton />}>
       <ForecastContent />
     </Suspense>
   );

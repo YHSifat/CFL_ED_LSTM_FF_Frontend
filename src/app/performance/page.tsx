@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { PageSkeleton } from "@/components/Skeleton";
 import HorizonSelect from "@/components/HorizonSelect";
 import KpiCard from "@/components/KpiCard";
 import LoadState from "@/components/LoadState";
@@ -55,11 +56,12 @@ function PerformanceContent() {
 
   const live = statusMap.state === "ready" ? statusMap.data.get(station.station_id) : undefined;
   const dangerLevel = live?.danger_level ?? station.danger_level_m;
+  const skillLoading = stationSkill.state === "loading";
   const current = stationSkill.state === "ready" ? stationSkill.data.find((r) => r.step === step) : undefined;
   const series = points.state === "ready" && points.data.length ? buildHorizonSeries(points.data, dangerLevel) : null;
 
   return (
-    <div className="flex flex-col gap-5 p-6">
+    <div className="flex flex-col gap-5 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Link href="/" className="text-xs font-medium text-text-secondary hover:text-accent">
@@ -80,11 +82,12 @@ function PerformanceContent() {
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <KpiCard label={`MAE (${horizon})`} value={fmt(current?.mae)} unit="m" accent />
-        <KpiCard label="RMSE" value={fmt(current?.rmse)} unit="m" />
-        <KpiCard label="NSE" value={fmt(current?.nse)} />
+        <KpiCard label={`MAE (${horizon})`} value={fmt(current?.mae)} unit="m" accent loading={skillLoading} />
+        <KpiCard label="RMSE" value={fmt(current?.rmse)} unit="m" loading={skillLoading} />
+        <KpiCard label="NSE" value={fmt(current?.nse)} loading={skillLoading} />
         <KpiCard
           label="MAE, repeat last reading"
+          loading={skillLoading}
           value={fmt(current?.mae_persistence)}
           unit="m"
           sub={current && <span className="text-xs text-text-tertiary">{current.n} readings scored</span>}
@@ -106,7 +109,7 @@ function PerformanceContent() {
       <div className="rounded-[var(--radius-card)] border border-border bg-card p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-sm font-semibold text-text-primary">All horizons</h2>
-          <div className="inline-flex gap-1.5">
+          <div className="inline-flex flex-wrap gap-1.5">
             {(["station", "all"] as Scope[]).map((s) => (
               <button
                 key={s}
@@ -125,7 +128,9 @@ function PerformanceContent() {
           </div>
         </div>
         {tableSkill.state === "ready" ? (
-          <HorizonTable rows={tableSkill.data} selected={horizon} onSelect={(h) => updateParams({ h })} />
+          <div className="overflow-x-auto">
+            <HorizonTable rows={tableSkill.data} selected={horizon} onSelect={(h) => updateParams({ h })} />
+          </div>
         ) : (
           <LoadState result={tableSkill} empty="" />
         )}
@@ -155,7 +160,7 @@ function HorizonTable({
   onSelect: (h: Horizon) => void;
 }) {
   return (
-    <table className="w-full text-sm">
+    <table className="w-full min-w-[480px] text-sm">
       <thead>
         <tr className="text-left text-xs text-text-tertiary">
           <th className="py-1 font-medium">Horizon</th>
@@ -196,7 +201,7 @@ function HorizonTable({
 
 export default function PerformancePage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-text-secondary">Loading…</div>}>
+    <Suspense fallback={<PageSkeleton />}>
       <PerformanceContent />
     </Suspense>
   );

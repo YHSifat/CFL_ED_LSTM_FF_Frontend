@@ -6,6 +6,7 @@ import { CLUSTER_COLOR_VAR } from "@/lib/stations";
 import { formatTime, toStatus, useStationStatus } from "@/lib/liveData";
 import { BASEMAP_INNER_SVG } from "@/lib/basemapMarkup";
 import type { Station } from "@/lib/types";
+import Skeleton from "./Skeleton";
 import StatusPill from "./StatusPill";
 
 const MIN_SCALE = 1;
@@ -114,6 +115,8 @@ export default function BangladeshMap({
   }
 
   function handlePointerDown(e: PointerEvent<SVGSVGElement>) {
+    // Touch has no hover: a tap on empty map closes the popup a station tap opened.
+    if (e.pointerType === "touch" && !(e.target as Element).closest("[data-station]")) setHoveredId(null);
     if (view.scale <= 1) return;
     (e.target as Element).setPointerCapture(e.pointerId);
     dragState.current = { startX: e.clientX, startY: e.clientY, startCx: view.cx, startCy: view.cy };
@@ -159,7 +162,8 @@ export default function BangladeshMap({
       <svg
         ref={svgRef}
         viewBox={viewBox}
-        className={`h-full w-full touch-none ${view.scale > 1 ? "cursor-grab active:cursor-grabbing" : ""}`}
+        // touch-none only while zoomed (dragging pans the map); otherwise a swipe scrolls the page.
+        className={`h-full w-full ${view.scale > 1 ? "touch-none cursor-grab active:cursor-grabbing" : ""}`}
         onDoubleClick={handleDoubleClick}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -169,36 +173,38 @@ export default function BangladeshMap({
         <g dangerouslySetInnerHTML={{ __html: BASEMAP_INNER_SVG }} />
         <rect x={0} y={0} width={MAP_WIDTH} height={MAP_HEIGHT} fill="none" stroke="var(--border)" strokeWidth={2} />
 
-        {stations.map((s) => {
-          const x = projectX(s.longitude);
-          const y = projectY(s.latitude);
-          const color = CLUSTER_COLOR_VAR[s.cluster];
-          const isSelected = s.station_id === selectedStationId;
-          return (
-            <g
-              key={s.station_id}
-              onClick={() => onSelectStation(s.station_id)}
-              onPointerEnter={() => setHoveredId(s.station_id)}
-              onPointerLeave={() => setHoveredId((id) => (id === s.station_id ? null : id))}
-              className="cursor-pointer"
-            >
-              {isSelected && (
-                <circle cx={x} cy={y} r={10} fill="none" stroke={color} strokeWidth={1.5} opacity={0.5} />
-              )}
-              <circle cx={x} cy={y} r={isSelected ? 7 : 5} fill={color} stroke="#fff" strokeWidth={1.5} />
-              <text
-                x={x + 8}
-                y={y + 3}
-                fontSize={10}
-                fontWeight={isSelected ? 700 : 500}
-                fill="var(--text-primary)"
-                style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}
-              >
-                {s.station_name}
-              </text>
-            </g>
-          );
-        })}
+        {stations.map((s) => (
+          <g
+            key={s.station_id}
+            onClick={() => onSelectStation(s.station_id)}
+            data-station={s.station_id}
+            onPointerEnter={() => setHoveredId(s.station_id)}
+            // On touch the popup stays open after the tap (closed by tapping elsewhere).
+            onPointerLeave={(e) => e.pointerType !== "touch" && setHoveredId((id) => (id === s.station_id ? null : id))}
+            className="cursor-pointer"
+          >
+            <StationMarker station={s} selected={s.station_id === selectedStationId} hovered={s.station_id === hoveredId} />
+          </g>
+        ))}
+
+        {/* SVG has no z-index: later shapes paint on top. Redraw the selected and hovered markers
+            last so their dot and label sit above all others. pointer-events none, so hover and
+            clicks still reach the real marker underneath (re-ordering those would flicker hover). */}
+        <g pointerEvents="none">
+          {[selectedStationId, hoveredId !== selectedStationId ? hoveredId : null].map((id) => {
+            const s = id ? stations.find((st) => st.station_id === id) : undefined;
+            return (
+              s && (
+                <StationMarker
+                  key={`top-${id}`}
+                  station={s}
+                  selected={id === selectedStationId}
+                  hovered={id === hoveredId}
+                />
+              )
+            );
+          })}
+        </g>
       </svg>
 
       <div className="absolute bottom-4 right-4 flex flex-col items-center gap-1 rounded-[var(--radius-card)] border border-border bg-card p-1 shadow-sm">
@@ -241,6 +247,28 @@ export default function BangladeshMap({
   );
 }
 
+function StationMarker({ station, selected, hovered }: { station: Station; selected: boolean; hovered: boolean }) {
+  const x = projectX(station.longitude);
+  const y = projectY(station.latitude);
+  const color = CLUSTER_COLOR_VAR[station.cluster];
+  return (
+    <>
+      {selected && <circle cx={x} cy={y} r={10} fill="none" stroke={color} strokeWidth={1.5} opacity={0.5} />}
+      <circle cx={x} cy={y} r={selected ? 7 : hovered ? 6 : 5} fill={color} stroke="#fff" strokeWidth={1.5} />
+      <text
+        x={x + 8}
+        y={y + 3}
+        fontSize={10}
+        fontWeight={selected || hovered ? 700 : 500}
+        fill="var(--text-primary)"
+        style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}
+      >
+        {station.station_name}
+      </text>
+    </>
+  );
+}
+
 function StationPopup({
   station,
   pos,
@@ -254,15 +282,18 @@ function StationPopup({
   const live = statusMap.state === "ready" ? statusMap.data.get(station.station_id) : undefined;
   const current = live?.current_wl ?? null;
   const dangerLevel = live?.danger_level ?? station.danger_level_m;
+  // Centre on the marker, but keep the whole card inside the map (8px margin).
+  const left = `clamp(calc(var(--pw) / 2 + 8px), ${pos.x}px, calc(100% - var(--pw) / 2 - 8px))`;
 
   return (
     <div
-      // pointer-events-none: the card must not cover the marker and end its own hover
-      className="pointer-events-none absolute z-10 w-72 rounded-[var(--radius-card)] border border-border bg-card p-4 shadow-lg"
+      // pointer-events-none: the card must not cover the marker and end its own hover.
+      // --pw = card width (compact on phones); `left` is clamped so the card stays inside the map.
+      className="pointer-events-none absolute z-10 w-[var(--pw)] rounded-[var(--radius-card)] border border-border bg-card p-3 shadow-lg [--pw:200px] sm:p-4 sm:[--pw:288px]"
       style={
         openBelow
-          ? { left: pos.x, top: pos.y + 16, transform: "translate(-50%, 0)" }
-          : { left: pos.x, top: Math.max(pos.y - 16, 16), transform: "translate(-50%, -100%)" }
+          ? { left, top: pos.y + 16, transform: "translate(-50%, 0)" }
+          : { left, top: Math.max(pos.y - 16, 16), transform: "translate(-50%, -100%)" }
       }
     >
       <div>
@@ -273,12 +304,14 @@ function StationPopup({
         {station.cluster} · {station.river_name}
       </div>
 
-      <div className="mt-3 flex items-center justify-between">
+      <div className="mt-2 flex items-center justify-between sm:mt-3">
         <div>
           <div className="text-[11px] text-text-secondary">Current WL</div>
-          <div className="font-mono text-lg font-semibold">
-            {statusMap.state === "loading" ? "…" : current != null ? `${current.toFixed(2)} m` : "–"}
-          </div>
+          {statusMap.state === "loading" ? (
+            <Skeleton className="mt-1 h-6 w-20" />
+          ) : (
+            <div className="font-mono text-base font-semibold sm:text-lg">{current != null ? `${current.toFixed(2)} m` : "–"}</div>
+          )}
         </div>
         <div className="text-right">
           <div className="text-[11px] text-text-secondary">Danger level</div>
@@ -286,7 +319,11 @@ function StationPopup({
         </div>
       </div>
       <div className="mt-2 flex items-center justify-between gap-2">
-        {statusMap.state === "ready" && <StatusPill status={toStatus(live)} />}
+        {statusMap.state === "loading" ? (
+          <Skeleton className="h-6 w-20 rounded-full" />
+        ) : (
+          statusMap.state === "ready" && <StatusPill status={toStatus(live)} />
+        )}
         {live?.last_obs_time && (
           <span className="text-[11px] text-text-tertiary">{formatTime(live.last_obs_time)}</span>
         )}

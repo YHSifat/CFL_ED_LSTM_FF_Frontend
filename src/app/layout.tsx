@@ -26,11 +26,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${jakarta.variable} ${plexMono.variable} h-full antialiased`}
     >
-      <body className="flex h-full min-h-screen bg-background text-text-primary">
-        <Suspense fallback={<div className="h-screen w-64 shrink-0 border-r border-border bg-card" />}>
+      <body className="flex h-full min-h-screen flex-col bg-background text-text-primary lg:flex-row">
+        <Suspense
+          fallback={
+            <div className="h-16 shrink-0 border-b border-border bg-card lg:h-screen lg:w-64 lg:border-b-0 lg:border-r" />
+          }
+        >
           <Sidebar />
         </Suspense>
-        <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">{children}</main>
       </body>
     </html>
   );

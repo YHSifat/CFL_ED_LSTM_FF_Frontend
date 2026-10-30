@@ -6,6 +6,7 @@ import StatusPill from "./StatusPill";
 import ObservedPredictedChart from "./ObservedPredictedChart";
 import HorizonSelect from "./HorizonSelect";
 import LoadState from "./LoadState";
+import Skeleton from "./Skeleton";
 
 export default function StationDetailsPanel({
   station,
@@ -21,7 +22,7 @@ export default function StationDetailsPanel({
 
   if (!station) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 rounded-[var(--radius-card)] border border-dashed border-border bg-card px-6 text-center">
+      <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 rounded-[var(--radius-card)] border border-dashed border-border bg-card px-6 text-center">
         <div className="text-sm font-medium text-text-secondary">No station selected</div>
         <p className="text-xs text-text-tertiary">
           Click a marker on the map, or pick a station from the dropdown above, to see its details here.
@@ -33,15 +34,20 @@ export default function StationDetailsPanel({
   const live = statusMap.state === "ready" ? statusMap.data.get(station.station_id) : undefined;
   const dangerLevel = live?.danger_level ?? station.danger_level_m;
   const readings = detail.state === "ready" ? latestReadings(detail.data) : null;
+  const detailLoading = detail.state === "loading";
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto rounded-[var(--radius-card)] border border-border bg-card p-4">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto rounded-[var(--radius-card)] border border-border bg-card p-4">
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="text-base font-semibold text-text-primary">{station.station_name}</div>
           <div className="font-mono text-xs text-text-tertiary">{station.station_id}</div>
         </div>
-        {statusMap.state === "ready" && <StatusPill status={toStatus(live)} />}
+        {statusMap.state === "loading" ? (
+          <Skeleton className="h-6 w-20 rounded-full" />
+        ) : (
+          statusMap.state === "ready" && <StatusPill status={toStatus(live)} />
+        )}
       </div>
 
       <div className="mt-1.5 flex items-center gap-1.5 text-xs text-text-secondary">
@@ -57,8 +63,8 @@ export default function StationDetailsPanel({
       </dl>
 
       <div className="mt-4 grid grid-cols-3 gap-3">
-        <Stat label="Current WL" value={readings?.current ? `${readings.current.wl.toFixed(2)} m` : "–"} accent />
-        <Stat label="Prev. day WL" value={readings?.previous ? `${readings.previous.wl.toFixed(2)} m` : "–"} />
+        <Stat label="Current WL" value={readings?.current ? `${readings.current.wl.toFixed(2)} m` : "–"} accent loading={detailLoading} />
+        <Stat label="Prev. day WL" value={readings?.previous ? `${readings.previous.wl.toFixed(2)} m` : "–"} loading={detailLoading} />
         <Stat label="Danger level" value={`${dangerLevel.toFixed(2)} m`} danger />
       </div>
       {readings?.current && (
@@ -93,11 +99,13 @@ function Stat({
   value,
   accent = false,
   danger = false,
+  loading = false,
 }: {
   label: string;
   value: string;
   accent?: boolean;
   danger?: boolean;
+  loading?: boolean;
 }) {
   return (
     <div
@@ -111,12 +119,16 @@ function Stat({
       }
     >
       <div className="text-[11px] text-text-secondary">{label}</div>
-      <div
-        className="font-mono text-sm font-semibold"
-        style={{ color: accent ? "var(--accent)" : "var(--text-primary)" }}
-      >
-        {value}
-      </div>
+      {loading ? (
+        <Skeleton className="mt-1 h-4 w-14" />
+      ) : (
+        <div
+          className="font-mono text-sm font-semibold"
+          style={{ color: accent ? "var(--accent)" : "var(--text-primary)" }}
+        >
+          {value}
+        </div>
+      )}
     </div>
   );
 }

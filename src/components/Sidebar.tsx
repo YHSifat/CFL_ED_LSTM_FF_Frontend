@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { FEATURES } from "@/lib/features";
 
 interface NavItem {
@@ -113,47 +113,109 @@ export default function Sidebar() {
     return qs ? `${item.href}?${qs}` : item.href;
   }
 
-  return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-border bg-card">
-      <div className="flex items-center gap-2 px-5 py-5">
-        <div
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-white"
-          style={{ background: "var(--accent)" }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2}>
-            <path d="M12 3c4 5 7 8.5 7 12a7 7 0 1 1-14 0c0-3.5 3-7 7-12Z" />
-          </svg>
-        </div>
-        <div className="leading-tight">
-          <div className="text-sm font-semibold text-text-primary">Water-Level</div>
-          <div className="text-xs text-text-secondary">Forecasting System</div>
-        </div>
-      </div>
+  const [open, setOpen] = useState(false);
 
-      <nav className="flex flex-col gap-1 px-3">
-        {NAV_ITEMS.filter((item) => item.enabled !== false).map((item) => {
-          const active = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={hrefFor(item)}
-              className="flex items-center gap-3 rounded-[var(--radius-card)] px-3 py-2.5 text-sm font-medium transition-colors"
-              style={
-                active
-                  ? { background: "var(--sidebar-active-bg)", color: "var(--sidebar-active-fg)" }
-                  : { color: "var(--text-secondary)" }
-              }
-            >
-              {item.icon}
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+  // Close the mobile drawer with Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
-      <div className="mt-auto px-5 py-4 text-xs text-text-tertiary">
-        25 BWDB gauge stations · 4 clusters
-      </div>
-    </aside>
+  const nav = (
+    <nav className="flex flex-col gap-1 px-3">
+      {NAV_ITEMS.filter((item) => item.enabled !== false).map((item) => {
+        const active = pathname === item.href;
+        return (
+          <Link
+            key={item.href}
+            href={hrefFor(item)}
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 rounded-[var(--radius-card)] px-3 py-2.5 text-sm font-medium transition-colors"
+            style={
+              active
+                ? { background: "var(--sidebar-active-bg)", color: "var(--sidebar-active-fg)" }
+                : { color: "var(--text-secondary)" }
+            }
+          >
+            {item.icon}
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
   );
+
+  return (
+    <>
+      {/* Narrow screens: top bar with a menu button that opens the nav as a drawer. */}
+      <header className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-3 lg:hidden">
+        <Brand />
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Open menu"
+          aria-expanded={open}
+          className="flex h-10 w-10 items-center justify-center rounded-lg text-text-secondary hover:bg-background"
+        >
+          <svg {...iconProps} width={22} height={22}>
+            <path d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </header>
+      {open && (
+        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />
+          <aside className="absolute inset-y-0 left-0 flex w-64 max-w-[80vw] flex-col bg-card shadow-xl">
+            <div className="flex items-center justify-between pr-3">
+              <Brand padded />
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Close menu"
+                className="flex h-10 w-10 items-center justify-center rounded-lg text-text-secondary hover:bg-background"
+              >
+                <svg {...iconProps} width={20} height={20}>
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </svg>
+              </button>
+            </div>
+            {nav}
+            <Footer />
+          </aside>
+        </div>
+      )}
+
+      {/* Wide screens: fixed sidebar. */}
+      <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-card lg:flex">
+        <Brand padded />
+        {nav}
+        <Footer />
+      </aside>
+    </>
+  );
+}
+
+function Brand({ padded = false }: { padded?: boolean }) {
+  return (
+    <div className={`flex items-center gap-2 ${padded ? "px-5 py-5" : ""}`}>
+      <div
+        className="flex h-9 w-9 items-center justify-center rounded-lg text-white"
+        style={{ background: "var(--accent)" }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2}>
+          <path d="M12 3c4 5 7 8.5 7 12a7 7 0 1 1-14 0c0-3.5 3-7 7-12Z" />
+        </svg>
+      </div>
+      <div className="leading-tight">
+        <div className="text-sm font-semibold text-text-primary">Water-Level</div>
+        <div className="text-xs text-text-secondary">Forecasting System</div>
+      </div>
+    </div>
+  );
+}
+
+function Footer() {
+  return <div className="mt-auto px-5 py-4 text-xs text-text-tertiary">25 BWDB gauge stations · 4 clusters</div>;
 }

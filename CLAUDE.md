@@ -12,8 +12,8 @@ and `/ffwc` are live; `/models` and `/explainability` are switched off (see Data
 - React 19, TypeScript (strict), Tailwind CSS v4 (`@tailwindcss/postcss`), Recharts 3,
   `@supabase/supabase-js` 2
 - Map: custom SVG, Web Mercator (`src/lib/projection.ts`) over an inline basemap
-  (`src/lib/basemapMarkup.ts`, generated from FFWC's own GeoJSON outline and river layers; see its
-  header). No map library. Marker popup opens on hover; clicking selects the station for the side panel.
+  (`src/lib/basemapMarkup.ts`, generated from FFWC's own GeoJSON outline and full river network; major
+  rivers thick and labelled, the rest thin and unlabelled; see its header). No map library. Marker popup opens on hover; clicking selects the station for the side panel.
 - Fonts: Plus Jakarta Sans + IBM Plex Mono via `next/font/google`.
 - npm (`package-lock.json`). Path alias `@/*` → `src/*`.
 
@@ -34,7 +34,9 @@ and `/ffwc` are live; `/models` and `/explainability` are switched off (see Data
 - `src/lib/`: `types.ts` (Station, Horizon, status), `stations.ts` (loads `data/stations.json`),
   `supabase.ts` (client), `liveData.ts` (all Supabase queries, hooks, chart shaping),
   `sampleData.ts` (generated values for mock pages), `csv.ts` (forecast CSV export), `modelColors.ts`.
-- `src/components/LoadState.tsx`: loading / error / empty placeholder for live data.
+- `src/components/LoadState.tsx`: loading (skeleton) / error / empty placeholder for live data.
+- `src/components/Skeleton.tsx`: shimmer placeholder (`.skeleton` sweep in `globals.css`) and `PageSkeleton`
+  for Suspense fallbacks. While live data loads, show skeletons (`KpiCard loading`, `LoadState`), not text.
 - `data/stations.json`: 25 stations with cluster, district, upazila, danger level.
 
 ## Data
@@ -54,6 +56,9 @@ and `/ffwc` are live; `/models` and `/explainability` are switched off (see Data
 ## Conventions
 - Station ids are FFWC WL codes (`SW7.5`), the same as backend `stations.id`.
 - Colors come from CSS variables in `src/app/globals.css` (`--status-*`, `--cluster-*`).
+- Responsive at Tailwind `lg` (1024px): below it the sidebar is a top bar + drawer (`Sidebar.tsx`), the map
+  page stacks map over panel (panel is sticky only at `lg`), KPI cards wrap two per row. Wide tables get
+  `overflow-x-auto`. Keep new pages free of horizontal overflow at 390px wide.
 - Only the Supabase **anon** key may appear here (via `NEXT_PUBLIC_*`). Never the DB password
   or `service_role` key. `.env*` is gitignored.
 - A change that needs a new/changed view goes in the backend `schema.sql` in the same task,

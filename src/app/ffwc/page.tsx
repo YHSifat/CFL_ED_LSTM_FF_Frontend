@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { PageSkeleton } from "@/components/Skeleton";
 import FfwcComparisonChart from "@/components/FfwcComparisonChart";
 import KpiCard from "@/components/KpiCard";
 import LoadState from "@/components/LoadState";
@@ -96,7 +97,7 @@ function FfwcContent() {
   const thisIssueRows = issue ? issueSkill(issue, scored) : [];
 
   return (
-    <div className="flex flex-col gap-5 p-6">
+    <div className="flex flex-col gap-5 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Link href="/" className="text-xs font-medium text-text-secondary hover:text-accent">
@@ -116,11 +117,11 @@ function FfwcContent() {
             onChange={(id) => updateParams({ station: id, issue: null })}
           />
           {issueList.length > 0 && issue && (
-            <div className="relative inline-block shrink-0">
+            <div className="relative inline-block max-w-full">
               <select
                 value={issueKey(issue)}
                 onChange={(e) => updateParams({ issue: e.target.value })}
-                className="appearance-none rounded-full border border-border bg-card py-2 pl-4 pr-10 text-sm font-medium text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/30"
+                className="w-full max-w-full appearance-none truncate rounded-full border border-border bg-card py-2 pl-4 pr-10 text-sm font-medium text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/30"
               >
                 {issueList.map((i) => (
                   <option key={issueKey(i)} value={issueKey(i)}>
@@ -139,9 +140,9 @@ function FfwcContent() {
       ) : (
         <>
           <div className="flex flex-wrap gap-3">
-            <KpiCard label="Matched points with a reading" value={`${scored.length}`} sub={issue && <span className="text-xs text-text-tertiary">of {issue.n} FFWC values</span>} />
-            <KpiCard label="MAE, ours" value={maeOurs == null ? "–" : maeOurs.toFixed(3)} unit="m" accent />
-            <KpiCard label="MAE, FFWC" value={maeFfwc == null ? "–" : maeFfwc.toFixed(3)} unit="m" />
+            <KpiCard label="Matched points with a reading" loading={detail.state === "loading"} value={`${scored.length}`} sub={issue && <span className="text-xs text-text-tertiary">of {issue.n} FFWC values</span>} />
+            <KpiCard label="MAE, ours" loading={detail.state === "loading"} value={maeOurs == null ? "–" : maeOurs.toFixed(3)} unit="m" accent />
+            <KpiCard label="MAE, FFWC" loading={detail.state === "loading"} value={maeFfwc == null ? "–" : maeFfwc.toFixed(3)} unit="m" />
           </div>
 
           <div className="rounded-[var(--radius-card)] border border-border bg-card p-4">
@@ -170,7 +171,7 @@ function FfwcContent() {
               <span className="ml-1 font-normal text-text-tertiary">· issued {issue.issued_on}</span>
             )}
           </h2>
-          <div className="inline-flex gap-1.5">
+          <div className="inline-flex flex-wrap gap-1.5">
             {(["issue", "station", "all"] as Scope[]).map((s) => (
               <button
                 key={s}
@@ -257,7 +258,7 @@ function SkillTables({ rows }: { rows: SkillRow[] }) {
 
 export default function FfwcPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-text-secondary">Loading…</div>}>
+    <Suspense fallback={<PageSkeleton />}>
       <FfwcContent />
     </Suspense>
   );

@@ -1,6 +1,7 @@
 import type { Loadable } from "@/lib/liveData";
+import Skeleton from "./Skeleton";
 
-/** Placeholder shown while live data loads, fails, or comes back empty. */
+/** Placeholder while live data loads (shimmer skeleton), fails, or comes back empty. */
 export default function LoadState<T>({
   result,
   empty,
@@ -10,8 +11,14 @@ export default function LoadState<T>({
   empty: string;
   height?: number;
 }) {
-  const text =
-    result.state === "loading" ? "Loading…" : result.state === "error" ? `Couldn't load data: ${result.message}` : empty;
+  if (result.state === "loading") {
+    return (
+      <div role="status" aria-label="Loading">
+        <Skeleton className="w-full rounded-[calc(var(--radius-card)_-_4px)]" style={{ height }} />
+      </div>
+    );
+  }
+  const text = result.state === "error" ? `Couldn't load data: ${result.message}` : empty;
   return (
     <div
       className="flex items-center justify-center rounded-[calc(var(--radius-card)_-_4px)] border border-dashed border-border px-4 text-center text-xs"
