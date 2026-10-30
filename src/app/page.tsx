@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import BangladeshMap from "@/components/BangladeshMap";
 import ClusterCard from "@/components/ClusterCard";
-import SampleDataBadge from "@/components/SampleDataBadge";
 import StationDetailsPanel from "@/components/StationDetailsPanel";
 import StationSelect from "@/components/StationSelect";
 import { CLUSTERS, getStationsByCluster, stations } from "@/lib/stations";
@@ -42,7 +41,6 @@ export default function HomePage() {
           <h1 className="text-lg font-semibold text-text-primary">Home / Interactive Map</h1>
           <p className="text-sm text-text-secondary">25 BWDB gauge stations across 4 federated-learning clusters</p>
         </div>
-        <SampleDataBadge />
       </div>
 
       <div className="flex flex-wrap gap-3">

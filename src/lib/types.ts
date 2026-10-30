@@ -17,4 +17,4 @@ export type Horizon = "3h" | "6h" | "12h" | "1D" | "3D" | "7D" | "15D";
 
 export const HORIZONS: Horizon[] = ["3h", "6h", "12h", "1D", "3D", "7D", "15D"];
 
-export type WaterLevelStatus = "Normal" | "Warning" | "Above danger";
+export type WaterLevelStatus = "Normal" | "Warning" | "Above danger" | "No data";

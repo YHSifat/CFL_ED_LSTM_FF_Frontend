@@ -9,5 +9,9 @@ const MR = 7331.27894934242;
 
 const mercN = (lat: number) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
 
-export const projectX = (lon: number) => (lon - MLON0) * (Math.PI / 180) * MR;
-export const projectY = (lat: number) => (mercN(MLAT0) - mercN(lat)) * MR;
+// Rounded to 0.01 px: Node and the browser can differ in the last float digits of
+// Math.log/tan, which made server-rendered marker positions fail hydration.
+const round2 = (v: number) => Math.round(v * 100) / 100;
+
+export const projectX = (lon: number) => round2((lon - MLON0) * (Math.PI / 180) * MR);
+export const projectY = (lat: number) => round2((mercN(MLAT0) - mercN(lat)) * MR);

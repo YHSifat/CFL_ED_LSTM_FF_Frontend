@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
+import { FEATURES } from "@/lib/features";
 
 interface NavItem {
   href: string;
@@ -10,6 +11,8 @@ interface NavItem {
   icon: ReactNode;
   /** Whether this page reads the station/horizon query params. */
   carriesSelection: boolean;
+  /** Hidden from the nav when false (see lib/features.ts). */
+  enabled?: boolean;
 }
 
 const iconProps = {
@@ -50,11 +53,24 @@ const NAV_ITEMS: NavItem[] = [
     href: "/models",
     label: "Model Comparison",
     carriesSelection: true,
+    enabled: FEATURES.modelComparison,
     icon: (
       <svg {...iconProps}>
         <rect x="3" y="12" width="4" height="8" />
         <rect x="10" y="7" width="4" height="13" />
         <rect x="17" y="3" width="4" height="17" />
+      </svg>
+    ),
+  },
+  {
+    href: "/performance",
+    label: "Forecast Performance",
+    carriesSelection: true,
+    icon: (
+      <svg {...iconProps}>
+        <path d="M4 19h16" />
+        <path d="M6 15l4-4 3 3 5-6" />
+        <circle cx="18" cy="8" r="1" />
       </svg>
     ),
   },
@@ -72,6 +88,7 @@ const NAV_ITEMS: NavItem[] = [
     href: "/explainability",
     label: "Explainability",
     carriesSelection: true,
+    enabled: FEATURES.explainability,
     icon: (
       <svg {...iconProps}>
         <circle cx="12" cy="12" r="9" />
@@ -114,7 +131,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex flex-col gap-1 px-3">
-        {NAV_ITEMS.map((item) => {
+        {NAV_ITEMS.filter((item) => item.enabled !== false).map((item) => {
           const active = pathname === item.href;
           return (
             <Link

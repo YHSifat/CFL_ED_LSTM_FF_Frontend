@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { FEATURES } from "@/lib/features";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import ModelComparisonChart from "@/components/ModelComparisonChart";
@@ -71,6 +72,16 @@ function ModelsContent() {
 }
 
 export default function ModelsPage() {
+  if (!FEATURES.modelComparison) {
+    return (
+      <div className="p-6 text-sm text-text-secondary">
+        Model comparison is turned off for now.{" "}
+        <Link href="/" className="font-medium text-accent">
+          Back to the map
+        </Link>
+      </div>
+    );
+  }
   return (
     <Suspense fallback={<div className="p-6 text-sm text-text-secondary">Loading…</div>}>
       <ModelsContent />

@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { CLUSTER_COLOR_VAR } from "@/lib/stations";
-import { getCurrentWL, getPreviousWL, getStatus, getObservedPredictedSeries } from "@/lib/sampleData";
+import { buildSeries, formatTime, latestReadings, toStatus, useStationDetail, useStationStatus } from "@/lib/liveData";
 import type { Horizon, Station } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import ObservedPredictedChart from "./ObservedPredictedChart";
 import HorizonSelect from "./HorizonSelect";
-import SampleDataBadge from "./SampleDataBadge";
+import LoadState from "./LoadState";
 
 export default function StationDetailsPanel({
   station,
@@ -16,6 +16,9 @@ export default function StationDetailsPanel({
   horizon: Horizon;
   onHorizonChange: (h: Horizon) => void;
 }) {
+  const statusMap = useStationStatus();
+  const detail = useStationDetail(station?.station_id ?? null);
+
   if (!station) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 rounded-[var(--radius-card)] border border-dashed border-border bg-card px-6 text-center">
@@ -27,10 +30,9 @@ export default function StationDetailsPanel({
     );
   }
 
-  const current = getCurrentWL(station);
-  const previous = getPreviousWL(station);
-  const status = getStatus(current, station.danger_level_m);
-  const series = getObservedPredictedSeries(station, horizon);
+  const live = statusMap.state === "ready" ? statusMap.data.get(station.station_id) : undefined;
+  const dangerLevel = live?.danger_level ?? station.danger_level_m;
+  const readings = detail.state === "ready" ? latestReadings(detail.data) : null;
 
   return (
     <div className="flex h-full flex-col overflow-y-auto rounded-[var(--radius-card)] border border-border bg-card p-4">
@@ -39,7 +41,7 @@ export default function StationDetailsPanel({
           <div className="text-base font-semibold text-text-primary">{station.station_name}</div>
           <div className="font-mono text-xs text-text-tertiary">{station.station_id}</div>
         </div>
-        <StatusPill status={status} />
+        {statusMap.state === "ready" && <StatusPill status={toStatus(live)} />}
       </div>
 
       <div className="mt-1.5 flex items-center gap-1.5 text-xs text-text-secondary">
@@ -55,17 +57,24 @@ export default function StationDetailsPanel({
       </dl>
 
       <div className="mt-4 grid grid-cols-3 gap-3">
-        <Stat label="Current WL" value={`${current.toFixed(2)} m`} accent />
-        <Stat label="Previous WL" value={`${previous.toFixed(2)} m`} />
-        <Stat label="Danger level" value={`${station.danger_level_m.toFixed(2)} m`} />
+        <Stat label="Current WL" value={readings?.current ? `${readings.current.wl.toFixed(2)} m` : "–"} accent />
+        <Stat label="Prev. day WL" value={readings?.previous ? `${readings.previous.wl.toFixed(2)} m` : "–"} />
+        <Stat label="Danger level" value={`${dangerLevel.toFixed(2)} m`} danger />
       </div>
+      {readings?.current && (
+        <div className="mt-1.5 text-[11px] text-text-tertiary">Last reading {formatTime(readings.current.time)}</div>
+      )}
 
       <div className="mt-4 flex items-center justify-between gap-2">
         <h3 className="text-xs font-semibold text-text-secondary">Observed vs. predicted</h3>
         <HorizonSelect value={horizon} onChange={onHorizonChange} />
       </div>
       <div className="mt-2">
-        <ObservedPredictedChart series={series} height={200} />
+        {detail.state === "ready" && detail.data.observed.length ? (
+          <ObservedPredictedChart series={buildSeries(detail.data, horizon, dangerLevel)} height={200} />
+        ) : (
+          <LoadState result={detail} empty="No readings for this station yet." height={200} />
+        )}
       </div>
 
       <Link
@@ -75,22 +84,30 @@ export default function StationDetailsPanel({
       >
         View Full Forecast
       </Link>
-
-      <div className="mt-3 flex justify-end">
-        <SampleDataBadge />
-      </div>
     </div>
   );
 }
 
-function Stat({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
+function Stat({
+  label,
+  value,
+  accent = false,
+  danger = false,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+  danger?: boolean;
+}) {
   return (
     <div
       className="rounded-[calc(var(--radius-card)_-_4px)] px-2.5 py-2"
       style={
         accent
           ? { background: "color-mix(in srgb, var(--accent) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)" }
-          : { background: "var(--background)", border: "1px solid var(--border)" }
+          : danger
+            ? { background: "var(--background)", border: "1px solid var(--status-danger-fg)" }
+            : { background: "var(--background)", border: "1px solid var(--border)" }
       }
     >
       <div className="text-[11px] text-text-secondary">{label}</div>

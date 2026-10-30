@@ -3,28 +3,16 @@
 import { useRef, useState, useCallback, useEffect, type PointerEvent, type MouseEvent } from "react";
 import { projectX, projectY, MAP_WIDTH, MAP_HEIGHT } from "@/lib/projection";
 import { CLUSTER_COLOR_VAR } from "@/lib/stations";
-import { getCurrentWL, getStatus } from "@/lib/sampleData";
+import { formatTime, toStatus, useStationStatus } from "@/lib/liveData";
 import { BASEMAP_INNER_SVG } from "@/lib/basemapMarkup";
 import type { Station } from "@/lib/types";
 import StatusPill from "./StatusPill";
-import SampleDataBadge from "./SampleDataBadge";
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 6;
-const RIVER_ZOOM_THRESHOLD = 1.2;
 // Rough on-screen height of the popup card, used to decide whether it has
 // room to open upward from the marker or should flip below it instead.
 const POPUP_HEIGHT_ESTIMATE = 340;
-
-// Guide paths baked into public/bangladesh.svg for curved river labels,
-// named rv_<River><index> — some rivers have multiple segments across the map.
-const RIVER_LABELS: { id: string; name: string }[] = [
-  { id: "rv_Tista0", name: "Tista" },
-  { id: "rv_Brahmaputra1", name: "Brahmaputra" },
-  { id: "rv_Brahmaputra2", name: "Brahmaputra" },
-  { id: "rv_Ganges3", name: "Ganges" },
-  { id: "rv_Ganges4", name: "Ganges" },
-];
 
 interface ViewState {
   cx: number;
@@ -48,9 +36,8 @@ export default function BangladeshMap({
   const [view, setView] = useState<ViewState>(DEFAULT_VIEW);
   const dragState = useRef<{ startX: number; startY: number; startCx: number; startCy: number } | null>(null);
   const hasZoomedRef = useRef(false);
-  // Dismissing the popup hides it without clearing the selection, so the
-  // details panel stays put; picking a station (even the same one) reopens it.
-  const [dismissedId, setDismissedId] = useState<string | null>(null);
+  // The popup follows the hovered marker; clicking a marker selects it for the side panel.
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const clampCenter = useCallback((cx: number, cy: number, scale: number) => {
     const vw = MAP_WIDTH / scale;
@@ -93,12 +80,6 @@ export default function BangladeshMap({
     const screenPt = pt.matrixTransform(ctm);
     const rect = container.getBoundingClientRect();
     return { x: screenPt.x - rect.left, y: screenPt.y - rect.top };
-  }
-
-  function selectStation(id: string) {
-    // Re-clicking a marker should reopen the popup even if it was dismissed.
-    setDismissedId(null);
-    onSelectStation(id);
   }
 
   function zoomBy(factor: number, focus?: { x: number; y: number }) {
@@ -154,21 +135,20 @@ export default function BangladeshMap({
     dragState.current = null;
   }
 
-  const selectedStation = stations.find((s) => s.station_id === selectedStationId) ?? null;
-  const popupOpen = !!selectedStation && selectedStationId !== dismissedId;
+  const hoveredStation = stations.find((s) => s.station_id === hoveredId) ?? null;
   const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null);
 
   // Popup position is a DOM measurement (SVG screen CTM), not derivable during
-  // render — it must be read after layout, and re-read whenever the selection
-  // or the pan/zoom transform changes.
+  // render — it must be read after layout, and re-read whenever the hovered
+  // station or the pan/zoom transform changes.
   /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
   useEffect(() => {
-    if (!selectedStation) {
+    if (!hoveredStation) {
       setPopupPos(null);
       return;
     }
-    setPopupPos(svgToContainer(projectX(selectedStation.longitude), projectY(selectedStation.latitude)));
-  }, [selectedStationId, view.cx, view.cy, view.scale]);
+    setPopupPos(svgToContainer(projectX(hoveredStation.longitude), projectY(hoveredStation.latitude)));
+  }, [hoveredId, view.cx, view.cy, view.scale]);
   /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   return (
@@ -189,32 +169,19 @@ export default function BangladeshMap({
         <g dangerouslySetInnerHTML={{ __html: BASEMAP_INNER_SVG }} />
         <rect x={0} y={0} width={MAP_WIDTH} height={MAP_HEIGHT} fill="none" stroke="var(--border)" strokeWidth={2} />
 
-        <g
-          style={{ opacity: view.scale > RIVER_ZOOM_THRESHOLD ? 1 : 0, transition: "opacity 300ms ease" }}
-          pointerEvents="none"
-        >
-          {RIVER_LABELS.map(({ id, name }, i) => (
-            <text
-              key={id + i}
-              fontSize={9}
-              fontWeight={600}
-              fill="#1F6FA0"
-              style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 2.5 }}
-            >
-              <textPath href={`#${id}`} startOffset="50%" textAnchor="middle">
-                {name}
-              </textPath>
-            </text>
-          ))}
-        </g>
-
         {stations.map((s) => {
           const x = projectX(s.longitude);
           const y = projectY(s.latitude);
           const color = CLUSTER_COLOR_VAR[s.cluster];
           const isSelected = s.station_id === selectedStationId;
           return (
-            <g key={s.station_id} onClick={() => selectStation(s.station_id)} className="cursor-pointer">
+            <g
+              key={s.station_id}
+              onClick={() => onSelectStation(s.station_id)}
+              onPointerEnter={() => setHoveredId(s.station_id)}
+              onPointerLeave={() => setHoveredId((id) => (id === s.station_id ? null : id))}
+              className="cursor-pointer"
+            >
               {isSelected && (
                 <circle cx={x} cy={y} r={10} fill="none" stroke={color} strokeWidth={1.5} opacity={0.5} />
               )}
@@ -261,14 +228,13 @@ export default function BangladeshMap({
         Reset view
       </button>
 
-      {popupOpen && selectedStation && popupPos && (
+      {hoveredStation && popupPos && (
         <StationPopup
-          station={selectedStation}
+          station={hoveredStation}
           pos={popupPos}
           // Not enough room above the marker (e.g. stations near the top of
           // the map) — open the popup downward instead so it isn't clipped.
           openBelow={popupPos.y < POPUP_HEIGHT_ESTIMATE}
-          onClose={() => setDismissedId(selectedStationId)}
         />
       )}
     </div>
@@ -279,38 +245,29 @@ function StationPopup({
   station,
   pos,
   openBelow,
-  onClose,
 }: {
   station: Station;
   pos: { x: number; y: number };
   openBelow: boolean;
-  onClose: () => void;
 }) {
-  const current = getCurrentWL(station);
-  const status = getStatus(current, station.danger_level_m);
+  const statusMap = useStationStatus();
+  const live = statusMap.state === "ready" ? statusMap.data.get(station.station_id) : undefined;
+  const current = live?.current_wl ?? null;
+  const dangerLevel = live?.danger_level ?? station.danger_level_m;
 
   return (
     <div
-      className="absolute z-10 w-72 rounded-[var(--radius-card)] border border-border bg-card p-4 shadow-lg"
+      // pointer-events-none: the card must not cover the marker and end its own hover
+      className="pointer-events-none absolute z-10 w-72 rounded-[var(--radius-card)] border border-border bg-card p-4 shadow-lg"
       style={
         openBelow
           ? { left: pos.x, top: pos.y + 16, transform: "translate(-50%, 0)" }
           : { left: pos.x, top: Math.max(pos.y - 16, 16), transform: "translate(-50%, -100%)" }
       }
     >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className="text-sm font-semibold text-text-primary">{station.station_name}</div>
-          <div className="font-mono text-xs text-text-tertiary">{station.station_id}</div>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="text-base text-text-tertiary hover:text-text-primary"
-        >
-          ✕
-        </button>
+      <div>
+        <div className="text-sm font-semibold text-text-primary">{station.station_name}</div>
+        <div className="font-mono text-xs text-text-tertiary">{station.station_id}</div>
       </div>
       <div className="mt-1 text-xs text-text-secondary">
         {station.cluster} · {station.river_name}
@@ -319,20 +276,26 @@ function StationPopup({
       <div className="mt-3 flex items-center justify-between">
         <div>
           <div className="text-[11px] text-text-secondary">Current WL</div>
-          <div className="font-mono text-lg font-semibold">{current.toFixed(2)} m</div>
+          <div className="font-mono text-lg font-semibold">
+            {statusMap.state === "loading" ? "…" : current != null ? `${current.toFixed(2)} m` : "–"}
+          </div>
         </div>
         <div className="text-right">
           <div className="text-[11px] text-text-secondary">Danger level</div>
-          <div className="font-mono text-sm text-text-tertiary">{station.danger_level_m.toFixed(2)} m</div>
+          <div className="font-mono text-sm text-text-tertiary">{dangerLevel.toFixed(2)} m</div>
         </div>
       </div>
-      <div className="mt-2">
-        <StatusPill status={status} />
+      <div className="mt-2 flex items-center justify-between gap-2">
+        {statusMap.state === "ready" && <StatusPill status={toStatus(live)} />}
+        {live?.last_obs_time && (
+          <span className="text-[11px] text-text-tertiary">{formatTime(live.last_obs_time)}</span>
+        )}
       </div>
-
-      <div className="mt-3 flex justify-end">
-        <SampleDataBadge />
-      </div>
+      {statusMap.state === "error" && (
+        <div className="mt-2 text-[11px]" style={{ color: "var(--status-danger-fg)" }}>
+          Couldn&apos;t load live data: {statusMap.message}
+        </div>
+      )}
     </div>
   );
 }

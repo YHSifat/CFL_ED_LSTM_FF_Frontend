@@ -30,7 +30,7 @@ export function buildForecastCsv(
   lines.push(csvRow(["station_type", station.station_type]));
   lines.push(csvRow(["danger_level_m", station.danger_level_m]));
   lines.push(csvRow(["current_wl_m", current]));
-  lines.push(csvRow(["previous_wl_m", previous]));
+  lines.push(csvRow(["previous_day_wl_m", previous]));
   lines.push(csvRow(["selected_horizon", horizon]));
   lines.push(csvRow(["generated_at", new Date().toISOString()]));
   lines.push("");

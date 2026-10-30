@@ -7,17 +7,19 @@ import ObservedPredictedChart from "@/components/ObservedPredictedChart";
 import HorizonSelect from "@/components/HorizonSelect";
 import KpiCard from "@/components/KpiCard";
 import StatusPill from "@/components/StatusPill";
-import SampleDataBadge from "@/components/SampleDataBadge";
+import LoadState from "@/components/LoadState";
 import StationSelect from "@/components/StationSelect";
 import { downloadCsv, buildForecastCsv } from "@/lib/csv";
 import {
-  getCurrentWL,
-  getForecast,
-  getForecastSummary,
-  getObservedPredictedSeries,
-  getPreviousWL,
-  getStatus,
-} from "@/lib/sampleData";
+  buildSeries,
+  forecastAt,
+  forecastSummary,
+  formatTime,
+  latestReadings,
+  toStatus,
+  useStationDetail,
+  useStationStatus,
+} from "@/lib/liveData";
 import { stations } from "@/lib/stations";
 import { HORIZONS, type Horizon } from "@/lib/types";
 
@@ -40,15 +42,20 @@ function ForecastContent() {
     router.push(`/forecast?${params.toString()}`, { scroll: false });
   }
 
-  const current = getCurrentWL(station);
-  const previous = getPreviousWL(station);
-  const status = getStatus(current, station.danger_level_m);
-  const forecast = getForecast(station, horizon);
-  const summary = getForecastSummary(station, HORIZONS);
-  const series = getObservedPredictedSeries(station, horizon);
+  const statusMap = useStationStatus();
+  const detail = useStationDetail(station.station_id);
+
+  const live = statusMap.state === "ready" ? statusMap.data.get(station.station_id) : undefined;
+  const dangerLevel = live?.danger_level ?? station.danger_level_m;
+  const data = detail.state === "ready" ? detail.data : null;
+  const { current, previous } = data ? latestReadings(data) : { current: null, previous: null };
+  const forecast = data ? forecastAt(data, horizon) : null;
+  const summary = data ? forecastSummary(data, HORIZONS, current?.wl ?? null) : [];
+  const series = data && data.observed.length ? buildSeries(data, horizon, dangerLevel) : null;
 
   function handleDownload() {
-    const csv = buildForecastCsv(station, horizon, current, previous, summary, series);
+    if (!series || !current) return;
+    const csv = buildForecastCsv(station, horizon, current.wl, previous?.wl ?? current.wl, summary, series);
     downloadCsv(`${station.station_id}_forecast.csv`, csv);
   }
 
@@ -70,7 +77,6 @@ function ForecastContent() {
 
         <div className="flex items-center gap-3">
           <StationSelect stations={stations} value={station.station_id} onChange={(id) => updateParams({ station: id })} />
-          <SampleDataBadge />
         </div>
       </div>
 
@@ -97,20 +103,39 @@ function ForecastContent() {
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <KpiCard label="Current WL" value={current.toFixed(2)} unit="m" />
-        <KpiCard label="Previous WL" value={previous.toFixed(2)} unit="m" />
+        <KpiCard
+          label="Current WL"
+          value={current ? current.wl.toFixed(2) : "–"}
+          unit="m"
+          sub={current && <span className="text-xs text-text-tertiary">{formatTime(current.time)}</span>}
+        />
+        <KpiCard
+          label="Previous day WL"
+          value={previous ? previous.wl.toFixed(2) : "–"}
+          unit="m"
+          sub={previous && <span className="text-xs text-text-tertiary">{formatTime(previous.time)}</span>}
+        />
         <KpiCard
           label="Danger level"
-          value={station.danger_level_m.toFixed(2)}
+          value={dangerLevel.toFixed(2)}
           unit="m"
           valueColor="var(--status-danger-fg)"
-          sub={<StatusPill status={status} />}
+          sub={statusMap.state === "ready" && <StatusPill status={toStatus(live)} />}
         />
         <KpiCard
           label={`Predicted WL (${horizon})`}
-          value={forecast.value.toFixed(2)}
+          value={forecast ? forecast.wl.toFixed(2) : "–"}
           unit="m"
-          sub={<DeltaLabel delta={forecast.deltaVsCurrent} onAccent />}
+          sub={
+            forecast && (
+              <span className="inline-flex flex-col">
+                {current && <DeltaLabel delta={forecast.wl - current.wl} onAccent />}
+                <span className="text-xs" style={{ color: "rgba(255,255,255,0.85)" }}>
+                  {formatTime(forecast.time)}
+                </span>
+              </span>
+            )
+          }
           accent
         />
       </div>
@@ -120,7 +145,16 @@ function ForecastContent() {
           <h2 className="text-sm font-semibold text-text-primary">Observed vs. predicted</h2>
           <HorizonSelect value={horizon} onChange={(h) => updateParams({ h })} />
         </div>
-        <ObservedPredictedChart series={series} height={320} />
+        {series ? (
+          <ObservedPredictedChart series={series} height={320} />
+        ) : (
+          <LoadState result={detail} empty="No readings for this station yet." height={320} />
+        )}
+        {data?.issuedOn && (
+          <p className="mt-2 text-xs text-text-tertiary">
+            Forecast issued {data.issuedOn} (input up to that day&apos;s 18:00 reading).
+          </p>
+        )}
       </div>
 
       <div className="rounded-[var(--radius-card)] border border-border bg-card p-4">
@@ -129,7 +163,8 @@ function ForecastContent() {
           <button
             type="button"
             onClick={handleDownload}
-            className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white"
+            disabled={!series || !current}
+            className="inline-flex disabled:opacity-50 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white"
             style={{ background: "var(--accent)" }}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -138,10 +173,13 @@ function ForecastContent() {
             Download CSV
           </button>
         </div>
+        {summary.length === 0 && <LoadState result={detail} empty="No forecast for this station yet." />}
         <ul className="divide-y divide-border">
           {summary.map((row) => (
             <li key={row.horizon} className="flex items-center justify-between py-2 text-sm">
-              <span className="font-mono text-text-secondary">{row.horizon}</span>
+              <span className="font-mono text-text-secondary">
+                {row.horizon} <span className="text-xs text-text-tertiary">({formatTime(row.time)})</span>
+              </span>
               <span className="font-mono font-medium text-text-primary">{row.value.toFixed(2)} m</span>
               <DeltaLabel delta={row.deltaVsCurrent} />
             </li>

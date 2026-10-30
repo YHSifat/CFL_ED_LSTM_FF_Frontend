@@ -75,6 +75,7 @@ export const STATUS_STYLE: Record<WaterLevelStatus, { fg: string; bg: string }> 
   Normal: { fg: "var(--status-normal-fg)", bg: "var(--status-normal-bg)" },
   Warning: { fg: "var(--status-warning-fg)", bg: "var(--status-warning-bg)" },
   "Above danger": { fg: "var(--status-danger-fg)", bg: "var(--status-danger-bg)" },
+  "No data": { fg: "var(--text-tertiary)", bg: "var(--background)" },
 };
 
 /** Deterministic forecast value + delta vs current, for one horizon. */
@@ -288,111 +289,6 @@ export function getModelComparisonSeries(station: Station, horizon: Horizon): Mo
   }
 
   return { points, nowIndex, dangerLevel: station.danger_level_m };
-}
-
-/**
- * FFWC comparison — our CFL-EDLSTM prediction vs. the FFWC (BWDB) number for
- * the same target time. FFWC publishes two different kinds of numbers that
- * are not interchangeable: an *observed* gauge reading (only exists for the
- * past) and an *official forecast* (only exists from the issue date forward)
- * — the mode toggle picks which one is being compared against.
- */
-export type FfwcMode = "Observed" | "Official forecast";
-
-const FFWC_WINDOW_DAYS = 6;
-
-function addDaysIso(dateIso: string, days: number): string {
-  const d = new Date(`${dateIso}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-function formatDateLabel(dateIso: string): string {
-  const d = new Date(`${dateIso}T00:00:00Z`);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-}
-
-/** Our model's point prediction for `station` at `dateIso` + `horizon`. */
-export function getFfwcPrediction(station: Station, horizon: Horizon, dateIso: string): number {
-  const rand = seededRand(station.station_id, "ffwc-our-point", horizon, dateIso);
-  const current = getCurrentWL(station);
-  const magnitude = 0.02 * station.danger_level_m * Math.sqrt(HORIZON_HOURS[horizon] / 24);
-  return round2(current + (rand() - 0.45) * magnitude);
-}
-
-/** The FFWC number for the same target time — a station-specific, mode-specific offset from our own prediction. */
-export function getFfwcValue(station: Station, horizon: Horizon, dateIso: string, mode: FfwcMode): number {
-  const ours = getFfwcPrediction(station, horizon, dateIso);
-  const rand = seededRand(station.station_id, "ffwc-bias", horizon, dateIso, mode);
-  // Official forecasts tend to diverge a bit more from our nowcast than same-day observed readings do.
-  const spread = (mode === "Observed" ? 0.02 : 0.035) * station.danger_level_m;
-  return round2(ours + (rand() - 0.5) * spread);
-}
-
-export interface FfwcSeriesPoint {
-  index: number;
-  dateIso: string;
-  dateLabel: string;
-  our: number;
-  /** Only present for d <= 0 (the past) — an observed reading can't exist for a future date. */
-  ffwcObserved?: number;
-  /** Only present for d >= 0 (today forward) — a forecast issued "today" doesn't cover the past. */
-  ffwcForecast?: number;
-}
-
-export interface FfwcComparisonSeries {
-  points: FfwcSeriesPoint[];
-  dateIndex: number;
-  dangerLevel: number;
-}
-
-/**
- * ~12-day window (6 days either side of `dateIso`) comparing our prediction
- * against FFWC. Observed and official-forecast FFWC values are shown
- * together in one series — they cover complementary, non-overlapping halves
- * of the window, so there's no need to toggle between them to see both.
- */
-export function getFfwcComparisonSeries(station: Station, horizon: Horizon, dateIso: string): FfwcComparisonSeries {
-  const current = getCurrentWL(station);
-  const noise = 0.012 * station.danger_level_m;
-
-  const startRand = seededRand(station.station_id, "ffwc-our-start", horizon, dateIso);
-  const endRand = seededRand(station.station_id, "ffwc-our-end", horizon, dateIso);
-  const startVal = current + (startRand() - 0.5) * noise * 4;
-  const endVal = current + (endRand() - 0.5) * noise * 4;
-
-  const span = FFWC_WINDOW_DAYS * 2;
-  const points: FfwcSeriesPoint[] = [];
-
-  for (let d = -FFWC_WINDOW_DAYS; d <= FFWC_WINDOW_DAYS; d++) {
-    const idx = d + FFWC_WINDOW_DAYS;
-    const progress = idx / span;
-    const pointDateIso = addDaysIso(dateIso, d);
-    const ourRand = seededRand(station.station_id, "ffwc-our-point-series", horizon, dateIso, d);
-    const our = round2(startVal + (endVal - startVal) * progress + (ourRand() - 0.5) * noise);
-
-    const point: FfwcSeriesPoint = { index: idx, dateIso: pointDateIso, dateLabel: formatDateLabel(pointDateIso), our };
-
-    if (d === 0) {
-      // The observed reading and the forecast issued "today" describe the
-      // same instant — anchor both lines to one shared value so they meet
-      // at a single point instead of two overlapping dots.
-      const anchorRand = seededRand(station.station_id, "ffwc-series-bias", horizon, dateIso, "anchor", d);
-      const anchor = round2(our + (anchorRand() - 0.5) * 0.02 * station.danger_level_m);
-      point.ffwcObserved = anchor;
-      point.ffwcForecast = anchor;
-    } else if (d < 0) {
-      const biasRand = seededRand(station.station_id, "ffwc-series-bias", horizon, dateIso, "Observed", d);
-      point.ffwcObserved = round2(our + (biasRand() - 0.5) * 0.02 * station.danger_level_m);
-    } else {
-      const biasRand = seededRand(station.station_id, "ffwc-series-bias", horizon, dateIso, "Official forecast", d);
-      point.ffwcForecast = round2(our + (biasRand() - 0.5) * 0.035 * station.danger_level_m);
-    }
-
-    points.push(point);
-  }
-
-  return { points, dateIndex: FFWC_WINDOW_DAYS, dangerLevel: station.danger_level_m };
 }
 
 /**

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { FEATURES } from "@/lib/features";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import ShapBarChart from "@/components/ShapBarChart";
@@ -100,6 +101,16 @@ function ExplainabilityContent() {
 }
 
 export default function ExplainabilityPage() {
+  if (!FEATURES.explainability) {
+    return (
+      <div className="p-6 text-sm text-text-secondary">
+        Explainability is turned off for now.{" "}
+        <Link href="/" className="font-medium text-accent">
+          Back to the map
+        </Link>
+      </div>
+    );
+  }
   return (
     <Suspense fallback={<div className="p-6 text-sm text-text-secondary">Loading…</div>}>
       <ExplainabilityContent />

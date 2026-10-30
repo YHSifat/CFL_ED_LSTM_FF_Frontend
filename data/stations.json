@@ -264,16 +264,16 @@
     "danger_level_m": 5.94
   },
   {
-    "station_id": "SW179",
-    "station_name": "Demra(Lakhya)",
+    "station_id": "SW177",
+    "station_name": "Lakhpur",
     "river_name": "Lakhya",
     "station_type": "Tidal",
-    "district": "Dhaka",
-    "upazila": "Demra",
-    "latitude": 23.72778,
-    "longitude": 90.50586,
+    "district": "Gazipur",
+    "upazila": "Kapasia",
+    "latitude": 24.040344,
+    "longitude": 90.650532,
     "cluster": "Urban",
-    "danger_level_m": 5.75
+    "danger_level_m": 5.35
   },
   {
     "station_id": "SW180",
