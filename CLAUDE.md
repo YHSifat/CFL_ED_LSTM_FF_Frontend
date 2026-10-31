@@ -18,6 +18,8 @@ and `/ffwc` are live; `/models` and `/explainability` are switched off (see Data
   logo wordmark (`font-brand`).
 - Branding: "Bonna" logo in `src/components/BonnaLogo.tsx`, from the design references
   `public/Header.dc.html` (light) / `HeaderDark.dc.html` (dark). App icon: `src/app/icon.png`, `apple-icon.png`.
+  The logo (`Brand` in `Sidebar.tsx`) is the only link home to the map; the nav has no map item, and
+  the map page has no visible heading (an `sr-only` h1 only).
 - npm (`package-lock.json`). Path alias `@/*` → `src/*`.
 
 ## Commands

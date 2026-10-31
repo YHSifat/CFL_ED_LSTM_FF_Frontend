@@ -6,15 +6,18 @@ export default function StationSelect({
   value,
   onChange,
   placeholder,
+  className = "",
 }: {
   stations: Station[];
   value: string;
   onChange: (id: string) => void;
   /** Shown as a disabled, unselectable first option when nothing should be pre-selected. */
   placeholder?: string;
+  /** Extra classes for the wrapper, e.g. to let it fill a flex row. */
+  className?: string;
 }) {
   return (
-    <div className="relative inline-block max-w-full">
+    <div className={`relative inline-block max-w-full ${className}`}>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}

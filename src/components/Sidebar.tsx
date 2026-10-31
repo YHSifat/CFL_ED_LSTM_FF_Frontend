@@ -30,17 +30,6 @@ const iconProps = {
 
 const NAV_ITEMS: NavItem[] = [
   {
-    href: "/",
-    label: "Interactive Map",
-    carriesSelection: true,
-    icon: (
-      <svg {...iconProps}>
-        <path d="M3 11.5 12 4l9 7.5" />
-        <path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9" />
-      </svg>
-    ),
-  },
-  {
     href: "/forecast",
     label: "Station Forecast",
     carriesSelection: true,
@@ -104,7 +93,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  function hrefFor(item: NavItem): string {
+  function hrefFor(item: Pick<NavItem, "href" | "carriesSelection">): string {
     if (!item.carriesSelection) return item.href;
     const station = searchParams.get("station");
     const h = searchParams.get("h");
@@ -124,6 +113,10 @@ export default function Sidebar() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
+
+  // The logo is the way home (the map); it keeps the selected station like the nav links.
+  const homeHref = hrefFor({ href: "/", carriesSelection: true });
+  const closeDrawer = () => setOpen(false);
 
   const nav = (
     <nav className="flex flex-col gap-1 px-3">
@@ -153,7 +146,7 @@ export default function Sidebar() {
     <>
       {/* Narrow screens: top bar with a menu button that opens the nav as a drawer. */}
       <header className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-3 lg:hidden">
-        <Brand />
+        <Brand href={homeHref} onClick={closeDrawer} />
         <div className="flex items-center gap-1">
           <ThemeToggle />
           <button
@@ -174,7 +167,7 @@ export default function Sidebar() {
           <div className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />
           <aside className="absolute inset-y-0 left-0 flex w-64 max-w-[80vw] flex-col bg-card shadow-xl">
             <div className="flex items-center justify-between pr-3">
-              <Brand padded />
+              <Brand href={homeHref} onClick={closeDrawer} padded />
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -194,7 +187,7 @@ export default function Sidebar() {
 
       {/* Wide screens: fixed sidebar. */}
       <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-card lg:flex">
-        <Brand padded />
+        <Brand href={homeHref} onClick={closeDrawer} padded />
         {nav}
         <Footer />
       </aside>
@@ -202,11 +195,16 @@ export default function Sidebar() {
   );
 }
 
-function Brand({ padded = false }: { padded?: boolean }) {
+function Brand({ href, onClick, padded = false }: { href: string; onClick: () => void; padded?: boolean }) {
   return (
-    <div className={padded ? "px-5 py-5" : ""}>
+    <Link
+      href={href}
+      onClick={onClick}
+      aria-label="Bonna home: interactive map"
+      className={`block rounded-[var(--radius-card)] transition-opacity hover:opacity-85 ${padded ? "px-5 py-5" : ""}`}
+    >
       <BonnaLogo />
-    </div>
+    </Link>
   );
 }
 
