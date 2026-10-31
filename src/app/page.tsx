@@ -54,7 +54,13 @@ function HomeContent() {
 
   return (
     <div className="flex flex-col gap-5 p-4 sm:p-6">
-      <h1 className="sr-only">Interactive map</h1>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-text-primary">Home / Interactive Map</h1>
+          <p className="text-sm text-text-secondary">25 BWDB gauge stations across 4 federated-learning clusters</p>
+        </div>
+      </div>
+
       {/* Phones: cluster dropdown + station dropdown on one line. sm and up: cluster pills. */}
       <div className="flex items-center gap-2 sm:flex-wrap sm:justify-between sm:gap-3">
         <div className="relative shrink-0 sm:hidden">
