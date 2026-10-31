@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cached } from "./dataCache";
 import { supabase } from "./supabase";
 import { HORIZON_HOURS, type ObservedPredictedSeries, type SeriesPoint } from "./sampleData";
 import type { Horizon, WaterLevelStatus } from "./types";
@@ -59,44 +60,46 @@ function client() {
 // ---- queries ---------------------------------------------------------------
 let statusPromise: Promise<Map<string, StationLive>> | null = null;
 
-/** All tracked stations' status, fetched once per page load. */
+/** All tracked stations' status, fetched once per data day (rows cached, see dataCache.ts). */
 export function fetchStationStatus(): Promise<Map<string, StationLive>> {
-  statusPromise ??= (async () => {
+  statusPromise ??= cached("status", async () => {
     const { data, error } = await client()
       .from("station_status")
       .select(
         "id,current_wl,last_obs_time,danger_level,warning_level,status,forecast_peak_wl,forecast_peak_time,forecast_exceeds_danger"
       );
     if (error) throw new Error(error.message);
-    return new Map((data as StationLive[]).map((row) => [row.id, row]));
-  })();
+    return data as StationLive[];
+  }).then((rows) => new Map(rows.map((row) => [row.id, row])));
   statusPromise.catch(() => (statusPromise = null)); // allow a retry after a failure
   return statusPromise;
 }
 
-export async function fetchStationDetail(stationId: string): Promise<StationDetail> {
-  const from = new Date(Date.now() - HISTORY_DAYS * 24 * 3600 * 1000).toISOString();
-  const [obs, fc] = await Promise.all([
-    client()
-      .from("observed_wl")
-      .select("obs_time,wl")
-      .eq("station_id", stationId)
-      .gte("obs_time", from)
-      .order("obs_time"),
-    client()
-      .from("latest_forecasts")
-      .select("issued_on,target_time,wl")
-      .eq("station_id", stationId)
-      .eq("source", "ours")
-      .order("target_time"),
-  ]);
-  if (obs.error) throw new Error(obs.error.message);
-  if (fc.error) throw new Error(fc.error.message);
-  return {
-    observed: obs.data.map((r) => ({ time: r.obs_time as string, wl: r.wl as number })),
-    forecast: fc.data.map((r) => ({ time: r.target_time as string, wl: r.wl as number })),
-    issuedOn: (fc.data[0]?.issued_on as string | undefined) ?? null,
-  };
+export function fetchStationDetail(stationId: string): Promise<StationDetail> {
+  return cached(`station:${stationId}`, async () => {
+    const from = new Date(Date.now() - HISTORY_DAYS * 24 * 3600 * 1000).toISOString();
+    const [obs, fc] = await Promise.all([
+      client()
+        .from("observed_wl")
+        .select("obs_time,wl")
+        .eq("station_id", stationId)
+        .gte("obs_time", from)
+        .order("obs_time"),
+      client()
+        .from("latest_forecasts")
+        .select("issued_on,target_time,wl")
+        .eq("station_id", stationId)
+        .eq("source", "ours")
+        .order("target_time"),
+    ]);
+    if (obs.error) throw new Error(obs.error.message);
+    if (fc.error) throw new Error(fc.error.message);
+    return {
+      observed: obs.data.map((r) => ({ time: r.obs_time as string, wl: r.wl as number })),
+      forecast: fc.data.map((r) => ({ time: r.target_time as string, wl: r.wl as number })),
+      issuedOn: (fc.data[0]?.issued_on as string | undefined) ?? null,
+    };
+  });
 }
 
 // ---- hooks -----------------------------------------------------------------
@@ -125,7 +128,7 @@ export function useStationStatus(): Loadable<Map<string, StationLive>> {
 }
 
 export function useStationDetail(stationId: string | null): Loadable<StationDetail> {
-  return useLoadable(stationId ? () => fetchStationDetail(stationId) : null, stationId ?? "");
+  return useLoadable(stationId ? () => fetchStationDetail(stationId) : null, `station:${stationId ?? ""}`);
 }
 
 // ---- shaping for the existing charts ---------------------------------------
@@ -225,51 +228,57 @@ export interface ComparisonDetail {
   observed: Reading[];
 }
 
-export async function fetchComparisonIssues(stationId: string): Promise<ComparisonIssue[]> {
-  const { data, error } = await client().rpc("comparison_issues", { p_station: stationId });
-  if (error) throw new Error(error.message);
-  return data as ComparisonIssue[];
+export function fetchComparisonIssues(stationId: string): Promise<ComparisonIssue[]> {
+  return cached(`issues:${stationId}`, async () => {
+    const { data, error } = await client().rpc("comparison_issues", { p_station: stationId });
+    if (error) throw new Error(error.message);
+    return data as ComparisonIssue[];
+  });
 }
 
-export async function fetchComparisonSkill(stationId: string | null): Promise<SkillRow[]> {
-  const { data, error } = await client().rpc("comparison_skill", { p_station: stationId });
-  if (error) throw new Error(error.message);
-  return data as SkillRow[];
+export function fetchComparisonSkill(stationId: string | null): Promise<SkillRow[]> {
+  return cached(`skill:${stationId ?? "all"}`, async () => {
+    const { data, error } = await client().rpc("comparison_skill", { p_station: stationId });
+    if (error) throw new Error(error.message);
+    return data as SkillRow[];
+  });
 }
 
 /** One issue day: our full forecast, FFWC's, and readings over the same span. */
-export async function fetchComparisonDetail(stationId: string, issue: ComparisonIssue): Promise<ComparisonDetail> {
-  const forecast = (source: string, product?: string) => {
-    let q = client()
-      .from("forecasts")
-      .select("target_time,wl")
+export function fetchComparisonDetail(stationId: string, issue: ComparisonIssue): Promise<ComparisonDetail> {
+  return cached(`detail:${stationId}:${issue.issued_on}:${issue.ffwc_product}`, async () => {
+    const forecast = (source: string, product?: string) => {
+      let q = client()
+        .from("forecasts")
+        .select("target_time,wl")
+        .eq("station_id", stationId)
+        .eq("source", source)
+        .eq("issued_on", issue.issued_on);
+      if (product) q = q.eq("model_version", product);
+      return q.order("target_time");
+    };
+    const [ffwc, ours] = await Promise.all([forecast("ffwc", issue.ffwc_product), forecast("ours")]);
+    if (ffwc.error) throw new Error(ffwc.error.message);
+    if (ours.error) throw new Error(ours.error.message);
+    const toReadings = (rows: { target_time: string; wl: number }[]) => rows.map((r) => ({ time: r.target_time, wl: r.wl }));
+    const ffwcSteps = toReadings(ffwc.data);
+    const end = ffwcSteps.at(-1)?.time;
+    // Start at 06:00 on the issue day (Asia/Dhaka, UTC+6) so the last observed day shows too.
+    const start = new Date(`${issue.issued_on}T06:00:00+06:00`).toISOString();
+    const obs = await client()
+      .from("observed_wl")
+      .select("obs_time,wl")
       .eq("station_id", stationId)
-      .eq("source", source)
-      .eq("issued_on", issue.issued_on);
-    if (product) q = q.eq("model_version", product);
-    return q.order("target_time");
-  };
-  const [ffwc, ours] = await Promise.all([forecast("ffwc", issue.ffwc_product), forecast("ours")]);
-  if (ffwc.error) throw new Error(ffwc.error.message);
-  if (ours.error) throw new Error(ours.error.message);
-  const toReadings = (rows: { target_time: string; wl: number }[]) => rows.map((r) => ({ time: r.target_time, wl: r.wl }));
-  const ffwcSteps = toReadings(ffwc.data);
-  const end = ffwcSteps.at(-1)?.time;
-  // Start at 06:00 on the issue day (Asia/Dhaka, UTC+6) so the last observed day shows too.
-  const start = new Date(`${issue.issued_on}T06:00:00+06:00`).toISOString();
-  const obs = await client()
-    .from("observed_wl")
-    .select("obs_time,wl")
-    .eq("station_id", stationId)
-    .gte("obs_time", start)
-    .lte("obs_time", end ?? start)
-    .order("obs_time");
-  if (obs.error) throw new Error(obs.error.message);
-  return {
-    ours: toReadings(ours.data).filter((r) => !end || r.time <= end),
-    ffwc: ffwcSteps,
-    observed: obs.data.map((r) => ({ time: r.obs_time as string, wl: r.wl as number })),
-  };
+      .gte("obs_time", start)
+      .lte("obs_time", end ?? start)
+      .order("obs_time");
+    if (obs.error) throw new Error(obs.error.message);
+    return {
+      ours: toReadings(ours.data).filter((r) => !end || r.time <= end),
+      ffwc: ffwcSteps,
+      observed: obs.data.map((r) => ({ time: r.obs_time as string, wl: r.wl as number })),
+    };
+  });
 }
 
 export function useComparisonIssues(stationId: string): Loadable<ComparisonIssue[]> {
@@ -353,16 +362,20 @@ export interface HorizonSkillRow {
   mae_persistence: number | null;
 }
 
-export async function fetchHorizonPerformance(stationId: string, step: number, from: string, to: string): Promise<HorizonPoint[]> {
-  const { data, error } = await client().rpc("horizon_performance", { p_station: stationId, p_step: step, p_from: from, p_to: to });
-  if (error) throw new Error(error.message);
-  return data as HorizonPoint[];
+export function fetchHorizonPerformance(stationId: string, step: number, from: string, to: string): Promise<HorizonPoint[]> {
+  return cached(`hp:${stationId}:${step}:${from}:${to}`, async () => {
+    const { data, error } = await client().rpc("horizon_performance", { p_station: stationId, p_step: step, p_from: from, p_to: to });
+    if (error) throw new Error(error.message);
+    return data as HorizonPoint[];
+  });
 }
 
-export async function fetchHorizonSkill(stationId: string | null, from: string, to: string): Promise<HorizonSkillRow[]> {
-  const { data, error } = await client().rpc("horizon_skill", { p_station: stationId, p_from: from, p_to: to });
-  if (error) throw new Error(error.message);
-  return data as HorizonSkillRow[];
+export function fetchHorizonSkill(stationId: string | null, from: string, to: string): Promise<HorizonSkillRow[]> {
+  return cached(`hs:${stationId ?? "all"}:${from}:${to}`, async () => {
+    const { data, error } = await client().rpc("horizon_skill", { p_station: stationId, p_from: from, p_to: to });
+    if (error) throw new Error(error.message);
+    return data as HorizonSkillRow[];
+  });
 }
 
 export function useHorizonPerformance(stationId: string, step: number, from: string, to: string): Loadable<HorizonPoint[]> {

@@ -20,6 +20,7 @@ import {
   type ComparisonPoint,
   type SkillRow,
 } from "@/lib/liveData";
+import { useSelectedStation } from "@/lib/selectedStation";
 import { stations } from "@/lib/stations";
 
 type Scope = "issue" | "station" | "all";
@@ -68,7 +69,7 @@ function FfwcContent() {
   const searchParams = useSearchParams();
 
   const stationParam = searchParams.get("station");
-  const station = stations.find((s) => s.station_id === stationParam) ?? stations[0];
+  const station = useSelectedStation(stationParam);
   const scopeParam = searchParams.get("scope");
   const scope: Scope = scopeParam === "all" || scopeParam === "station" ? scopeParam : "issue";
 
@@ -84,7 +85,9 @@ function FfwcContent() {
   const statusMap = useStationStatus();
   const issues = useComparisonIssues(station.station_id);
   const issueList = issues.state === "ready" ? issues.data : [];
-  const issue = issueList.find((i) => issueKey(i) === searchParams.get("issue")) ?? issueList[0] ?? null;
+  // Default: the newest issue with at least one matched point (ours + FFWC + reading), else the newest.
+  const defaultIssue = issueList.find((i) => i.n_observed > 0) ?? issueList[0] ?? null;
+  const issue = issueList.find((i) => issueKey(i) === searchParams.get("issue")) ?? defaultIssue;
   const detail = useComparisonDetail(station.station_id, issue);
   const skill = useComparisonSkill(scope === "all" ? null : station.station_id);
 
@@ -100,7 +103,7 @@ function FfwcContent() {
     <div className="flex flex-col gap-5 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link href="/" className="text-xs font-medium text-text-secondary hover:text-accent">
+          <Link href={`/?station=${encodeURIComponent(station.station_id)}`} className="text-xs font-medium text-text-secondary hover:text-accent">
             ← Map
           </Link>
           <h1 className="mt-1 text-lg font-semibold text-text-primary">
@@ -135,8 +138,14 @@ function FfwcContent() {
         </div>
       </div>
 
-      {issues.state !== "ready" || issueList.length === 0 ? (
-        <LoadState result={issues} empty="No issue day has both our forecast and FFWC's for this station yet." />
+      {issues.state !== "ready" ? (
+        <LoadState result={issues} empty="" height={320} />
+      ) : issueList.length === 0 ? (
+        <NoIssues
+          stationName={station.station_name}
+          stationId={station.station_id}
+          onChangeStation={(id) => updateParams({ station: id, issue: null })}
+        />
       ) : (
         <>
           <div className="flex flex-wrap gap-3">
@@ -160,56 +169,82 @@ function FfwcContent() {
               </p>
             )}
           </div>
+
+          <div className="rounded-[var(--radius-card)] border border-border bg-card p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-text-primary">
+                Performance by lead time
+                {scope === "issue" && issue && (
+                  <span className="ml-1 font-normal text-text-tertiary">· issued {issue.issued_on}</span>
+                )}
+              </h2>
+              <div className="inline-flex flex-wrap gap-1.5">
+                {(["issue", "station", "all"] as Scope[]).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => updateParams({ scope: s })}
+                    className="rounded-full px-4 py-1.5 text-xs font-medium"
+                    style={
+                      scope === s
+                        ? { background: "var(--accent)", color: "#fff" }
+                        : { background: "var(--card)", color: "var(--text-secondary)", border: "1px solid var(--border)" }
+                    }
+                  >
+                    {SCOPE_LABEL[s]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {scope === "issue" ? (
+              thisIssueRows.length ? (
+                <SkillTables rows={thisIssueRows} />
+              ) : (
+                <LoadState result={detail} empty="None of this issue's target times have a reading yet." />
+              )
+            ) : skill.state === "ready" && skill.data.length ? (
+              <SkillTables rows={skill.data} />
+            ) : (
+              <LoadState result={skill} empty="No scored forecasts yet." />
+            )}
+            <p className="mt-3 text-xs text-text-tertiary">
+              Mean absolute error (MAE) in metres, only at times where both forecasts exist and FFWC has posted the
+              reading. Lead day = target day − issue day. Our forecasts before 30 Oct 2026 are hindcasts: the model was
+              run later, using only data available on the issue day. Source:{" "}
+              <a href="https://www.ffwc.gov.bd/" target="_blank" rel="noopener noreferrer" className="underline hover:text-accent">
+                Flood Forecasting &amp; Warning Centre (FFWC), BWDB
+              </a>
+              .
+            </p>
+          </div>
         </>
       )}
+    </div>
+  );
+}
 
-      <div className="rounded-[var(--radius-card)] border border-border bg-card p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-text-primary">
-            Performance by lead time
-            {scope === "issue" && issue && (
-              <span className="ml-1 font-normal text-text-tertiary">· issued {issue.issued_on}</span>
-            )}
-          </h2>
-          <div className="inline-flex flex-wrap gap-1.5">
-            {(["issue", "station", "all"] as Scope[]).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => updateParams({ scope: s })}
-                className="rounded-full px-4 py-1.5 text-xs font-medium"
-                style={
-                  scope === s
-                    ? { background: "var(--accent)", color: "#fff" }
-                    : { background: "var(--card)", color: "var(--text-secondary)", border: "1px solid var(--border)" }
-                }
-              >
-                {SCOPE_LABEL[s]}
-              </button>
-            ))}
-          </div>
-        </div>
-        {scope === "issue" ? (
-          thisIssueRows.length ? (
-            <SkillTables rows={thisIssueRows} />
-          ) : (
-            <LoadState result={detail} empty="None of this issue's target times have a reading yet." />
-          )
-        ) : skill.state === "ready" && skill.data.length ? (
-          <SkillTables rows={skill.data} />
-        ) : (
-          <LoadState result={skill} empty="No scored forecasts yet." />
-        )}
-        <p className="mt-3 text-xs text-text-tertiary">
-          Mean absolute error (MAE) in metres, only at times where both forecasts exist and FFWC has posted the
-          reading. Lead day = target day − issue day. Our forecasts before 30 Oct 2026 are hindcasts: the model was
-          run later, using only data available on the issue day. Source:{" "}
-          <a href="https://www.ffwc.gov.bd/" target="_blank" rel="noopener noreferrer" className="underline hover:text-accent">
-            Flood Forecasting &amp; Warning Centre (FFWC), BWDB
-          </a>
-          .
+/** Shown instead of the chart and tables when the station has no comparable issue day. */
+function NoIssues({
+  stationName,
+  stationId,
+  onChangeStation,
+}: {
+  stationName: string;
+  stationId: string;
+  onChangeStation: (id: string) => void;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-4 rounded-[var(--radius-card)] border border-dashed border-border bg-card px-6 py-16 text-center">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M4 12h4l3-8 4 16 3-8h2" />
+      </svg>
+      <div>
+        <p className="text-xl font-semibold text-text-primary sm:text-2xl">No FFWC comparison for {stationName} yet</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-text-secondary">
+          No issue day has both our forecast and FFWC&apos;s for this station. Please choose another station.
         </p>
       </div>
+      <StationSelect stations={stations} value={stationId} onChange={onChangeStation} />
     </div>
   );
 }

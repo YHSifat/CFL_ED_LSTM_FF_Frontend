@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { FEATURES } from "@/lib/features";
+import BonnaLogo from "@/components/BonnaLogo";
+import ThemeToggle from "@/components/ThemeToggle";
 
 interface NavItem {
   href: string;
@@ -30,7 +32,7 @@ const NAV_ITEMS: NavItem[] = [
   {
     href: "/",
     label: "Interactive Map",
-    carriesSelection: false,
+    carriesSelection: true,
     icon: (
       <svg {...iconProps}>
         <path d="M3 11.5 12 4l9 7.5" />
@@ -152,17 +154,20 @@ export default function Sidebar() {
       {/* Narrow screens: top bar with a menu button that opens the nav as a drawer. */}
       <header className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-3 lg:hidden">
         <Brand />
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label="Open menu"
-          aria-expanded={open}
-          className="flex h-10 w-10 items-center justify-center rounded-lg text-text-secondary hover:bg-background"
-        >
-          <svg {...iconProps} width={22} height={22}>
-            <path d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-1">
+          <ThemeToggle />
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label="Open menu"
+            aria-expanded={open}
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-text-secondary hover:bg-background"
+          >
+            <svg {...iconProps} width={22} height={22}>
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        </div>
       </header>
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
@@ -199,23 +204,17 @@ export default function Sidebar() {
 
 function Brand({ padded = false }: { padded?: boolean }) {
   return (
-    <div className={`flex items-center gap-2 ${padded ? "px-5 py-5" : ""}`}>
-      <div
-        className="flex h-9 w-9 items-center justify-center rounded-lg text-white"
-        style={{ background: "var(--accent)" }}
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2}>
-          <path d="M12 3c4 5 7 8.5 7 12a7 7 0 1 1-14 0c0-3.5 3-7 7-12Z" />
-        </svg>
-      </div>
-      <div className="leading-tight">
-        <div className="text-sm font-semibold text-text-primary">Water-Level</div>
-        <div className="text-xs text-text-secondary">Forecasting System</div>
-      </div>
+    <div className={padded ? "px-5 py-5" : ""}>
+      <BonnaLogo />
     </div>
   );
 }
 
 function Footer() {
-  return <div className="mt-auto px-5 py-4 text-xs text-text-tertiary">25 BWDB gauge stations · 4 clusters</div>;
+  return (
+    <div className="mt-auto flex items-center justify-between gap-2 py-3 pl-5 pr-3 text-xs text-text-tertiary">
+      <span>25 BWDB gauge stations · 4 clusters</span>
+      <ThemeToggle />
+    </div>
+  );
 }

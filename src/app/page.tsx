@@ -1,20 +1,41 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
 import BangladeshMap from "@/components/BangladeshMap";
+import { PageSkeleton } from "@/components/Skeleton";
 import StationDetailsPanel from "@/components/StationDetailsPanel";
 import StationSelect from "@/components/StationSelect";
+import { useSelectedStation } from "@/lib/selectedStation";
 import { CLUSTERS, stations } from "@/lib/stations";
-import type { Cluster, Horizon } from "@/lib/types";
+import { HORIZONS, type Cluster, type Horizon } from "@/lib/types";
 
 type ClusterFilter = Cluster | "All";
 
-const DEFAULT_STATION_ID = stations.find((s) => s.station_name === "Dalia")?.station_id ?? stations[0].station_id;
+function isHorizon(v: string | null): v is Horizon {
+  return !!v && (HORIZONS as string[]).includes(v);
+}
 
-export default function HomePage() {
+function HomeContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [filter, setFilter] = useState<ClusterFilter>("All");
-  const [selectedStationId, setSelectedStationId] = useState<string | null>(DEFAULT_STATION_ID);
-  const [horizon, setHorizon] = useState<Horizon>("15D");
+
+  // Station and horizon live in the URL (?station=…&h=…) like on the other pages; without
+  // ?station the last selected station is shown (lib/selectedStation.ts).
+  const stationParam = searchParams.get("station");
+  const selectedStationId = useSelectedStation(stationParam).station_id;
+  const horizon = isHorizon(searchParams.get("h")) ? (searchParams.get("h") as Horizon) : "15D";
+
+  function updateParams(next: { station?: string; h?: Horizon }) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next.station) params.set("station", next.station);
+    if (next.h) params.set("h", next.h);
+    // replace, not push: clicking through markers shouldn't fill the back-button history.
+    router.replace(`/?${params.toString()}`, { scroll: false });
+  }
+  const setSelectedStationId = (id: string | null) => id && updateParams({ station: id });
+  const setHorizon = (h: Horizon) => updateParams({ h });
 
   const visibleStations = useMemo(
     () => (filter === "All" ? stations : stations.filter((s) => s.cluster === filter)),
@@ -57,7 +78,7 @@ export default function HomePage() {
         <StationSelect
           stations={visibleStations}
           value={selectedStationId ?? ""}
-          onChange={(id) => setSelectedStationId(id || null)}
+          onChange={setSelectedStationId}
           placeholder="Jump to station…"
         />
       </div>
@@ -78,5 +99,13 @@ export default function HomePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <HomeContent />
+    </Suspense>
   );
 }

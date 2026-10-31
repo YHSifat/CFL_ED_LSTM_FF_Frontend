@@ -170,7 +170,7 @@ export default function BangladeshMap({
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
       >
-        <g dangerouslySetInnerHTML={{ __html: BASEMAP_INNER_SVG }} />
+        <g className="basemap" dangerouslySetInnerHTML={{ __html: BASEMAP_INNER_SVG }} />
         <rect x={0} y={0} width={MAP_WIDTH} height={MAP_HEIGHT} fill="none" stroke="var(--border)" strokeWidth={2} />
 
         {stations.map((s) => (
@@ -261,7 +261,7 @@ function StationMarker({ station, selected, hovered }: { station: Station; selec
         fontSize={10}
         fontWeight={selected || hovered ? 700 : 500}
         fill="var(--text-primary)"
-        style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}
+        style={{ paintOrder: "stroke", stroke: "var(--map-halo)", strokeWidth: 3 }}
       >
         {station.station_name}
       </text>

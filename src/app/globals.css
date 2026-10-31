@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Dark mode: `dark` class on <html> (set by the script in app/layout.tsx, toggled by ThemeToggle). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #f6f7f9;
   --card: #ffffff;
@@ -25,6 +28,118 @@
 
   --sidebar-active-bg: #e8f3f4;
   --sidebar-active-fg: #0b6a72;
+
+  /* FFWC's forecast line in comparison charts */
+  --series-ffwc: #b54708;
+
+  /* Bonna logo (public/Header.dc.html) */
+  --logo-tile: #0b3d5c;
+  --logo-title: #0b3d5c;
+  --logo-tagline: #47606f;
+
+  /* Station label halo on the map */
+  --map-halo: #ffffff;
+
+  --skeleton-base: #eceff3;
+  --skeleton-shine: rgba(255, 255, 255, 0.75);
+}
+
+/* Dark theme, from the dark logo (public/HeaderDark.dc.html), with a darker navy ground than its #0A2433;
+   tile blue #14587F, water blues #3BA7D6 / #1E86B8, gauge orange #F59E3B. */
+.dark {
+  color-scheme: dark;
+
+  --background: #030c12;
+  --card: #07161f;
+  --border: #122a3a;
+
+  --text-primary: #f2f7fa;
+  --text-secondary: #a9c3d1;
+  --text-tertiary: #84a2b3;
+
+  --accent: #1e86b8;
+
+  --cluster-upstream: #7aa2f7;
+  --cluster-midriver: #4cc38a;
+  --cluster-downstream: #f59e3b;
+  --cluster-urban: #b294f5;
+
+  --status-normal-fg: #5fd39a;
+  --status-normal-bg: #0a261e;
+  --status-warning-fg: #f7b955;
+  --status-warning-bg: #2a1f0c;
+  --status-danger-fg: #ff8a80;
+  --status-danger-bg: #301317;
+
+  --sidebar-active-bg: #14587f;
+  --sidebar-active-fg: #ffffff;
+
+  --series-ffwc: #f59e3b;
+
+  --logo-tile: #14587f;
+  --logo-title: #ffffff;
+  --logo-tagline: #a9c3d1;
+
+  --map-halo: #07161f;
+
+  --skeleton-base: #0d2130;
+  --skeleton-shine: rgba(255, 255, 255, 0.08);
+}
+
+/* The generated basemap (lib/basemapMarkup.ts) uses fixed presentation attributes; CSS beats
+   those, so recolour it here by original colour rather than editing the generated file. */
+.dark .basemap [fill="#D4EBF8"] { fill: #02090e; } /* sea */
+.dark .basemap [fill="#EEEEEC"] { fill: #07161f; } /* neighbouring countries */
+.dark .basemap [stroke="#C9C9C6"] { stroke: #153246; }
+.dark .basemap [fill="#F1E6C4"] { fill: #0e2a3b; } /* Bangladesh */
+.dark .basemap [stroke="#7E949C"] { stroke: #5d8aa3; } /* national border */
+.dark .basemap [stroke="#F1E6C4"] { stroke: #0e2a3b; } /* river label halo */
+.dark .basemap [stroke="#4FA9DE"] { stroke: #3ba7d6; } /* major rivers */
+.dark .basemap [stroke="#5DB1E3"] { stroke: #2c7aa6; } /* minor rivers */
+.dark .basemap [stroke="#BFE2F5"] { stroke: #123a52; } /* major river casing */
+.dark .basemap [fill="#2A7FB8"] { fill: #7cc6ea; } /* river / sea labels */
+.dark .basemap [fill="#3A3A38"] { fill: #a9c3d1; } /* place labels, scale bar */
+.dark .basemap [stroke="#3A3A38"] { stroke: #a9c3d1; }
+.dark .basemap [fill="#FFFFFF"] { fill: #07161f; } /* scale bar blanks */
+
+/* Theme switch: the new theme spreads from the toggle (see spreadTheme in ThemeToggle.tsx).
+   Replace the default cross-fade; the clip-path and ring are animated from script. */
+.theme-transition::view-transition-old(root),
+.theme-transition::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+.theme-transition::view-transition-group(theme-flash),
+.theme-transition::view-transition-new(theme-flash) {
+  animation: none;
+}
+
+.theme-transition::view-transition-new(theme-flash) {
+  transform-origin: center;
+}
+
+.theme-flash {
+  view-transition-name: theme-flash;
+  position: fixed;
+  z-index: 100;
+  pointer-events: none;
+  border-radius: 50%;
+  /* Bright front (logo water blues, white core) fading inwards into the new theme. */
+  background: radial-gradient(
+    circle closest-side,
+    transparent 80%,
+    rgba(59, 167, 214, 0.18) 90%,
+    rgba(59, 167, 214, 0.55) 96%,
+    rgba(255, 255, 255, 0.9) 99%,
+    transparent 100%
+  );
+}
+
+/* Recharts' default tooltip is white with dark text; follow the theme instead. */
+.recharts-default-tooltip {
+  background-color: var(--card) !important;
+  color: var(--text-primary);
 }
 
 @theme inline {
@@ -55,6 +170,7 @@
 
   --font-sans: var(--font-jakarta);
   --font-mono: var(--font-plex-mono);
+  --font-brand: var(--font-manrope), var(--font-noto-bengali), system-ui, sans-serif;
 
   --radius-card: 14px;
 }
@@ -76,8 +192,8 @@ body {
 }
 
 .skeleton {
-  background-color: #eceff3;
-  background-image: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.75) 50%, transparent 100%);
+  background-color: var(--skeleton-base);
+  background-image: linear-gradient(90deg, transparent 0%, var(--skeleton-shine) 50%, transparent 100%);
   background-size: 50% 100%;
   background-repeat: no-repeat;
   animation: skeleton-sweep 1.4s ease-in-out infinite;

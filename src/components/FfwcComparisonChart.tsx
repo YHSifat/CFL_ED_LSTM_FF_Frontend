@@ -79,7 +79,7 @@ export default function FfwcComparisonChart({
           type="monotone"
           dataKey="ffwc"
           name="FFWC forecast"
-          stroke="#B54708"
+          stroke="var(--series-ffwc)"
           strokeWidth={2}
           dot={{ r: 2.5 }}
           connectNulls

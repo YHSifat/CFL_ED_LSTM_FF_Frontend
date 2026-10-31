@@ -21,6 +21,7 @@ import {
   useStationDetail,
   useStationStatus,
 } from "@/lib/liveData";
+import { useSelectedStation } from "@/lib/selectedStation";
 import { stations } from "@/lib/stations";
 import { HORIZONS, type Horizon } from "@/lib/types";
 
@@ -33,7 +34,7 @@ function ForecastContent() {
   const searchParams = useSearchParams();
 
   const stationParam = searchParams.get("station");
-  const station = stations.find((s) => s.station_id === stationParam) ?? stations[0];
+  const station = useSelectedStation(stationParam);
   const horizon = isHorizon(searchParams.get("h")) ? (searchParams.get("h") as Horizon) : "15D";
 
   function updateParams(next: { station?: string; h?: Horizon }) {
@@ -64,7 +65,7 @@ function ForecastContent() {
     <div className="flex flex-col gap-5 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link href="/" className="text-xs font-medium text-text-secondary hover:text-accent">
+          <Link href={`/?station=${encodeURIComponent(station.station_id)}`} className="text-xs font-medium text-text-secondary hover:text-accent">
             ← Map
           </Link>
           <h1 className="mt-1 text-lg font-semibold text-text-primary">

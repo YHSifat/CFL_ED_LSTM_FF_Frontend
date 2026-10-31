@@ -14,7 +14,10 @@ and `/ffwc` are live; `/models` and `/explainability` are switched off (see Data
 - Map: custom SVG, Web Mercator (`src/lib/projection.ts`) over an inline basemap
   (`src/lib/basemapMarkup.ts`, generated from FFWC's own GeoJSON outline and full river network; major
   rivers thick and labelled, the rest thin and unlabelled; see its header). No map library. Marker popup opens on hover; clicking selects the station for the side panel.
-- Fonts: Plus Jakarta Sans + IBM Plex Mono via `next/font/google`.
+- Fonts: Plus Jakarta Sans + IBM Plex Mono via `next/font/google`; Manrope + Noto Sans Bengali for the
+  logo wordmark (`font-brand`).
+- Branding: "Bonna" logo in `src/components/BonnaLogo.tsx`, from the design references
+  `public/Header.dc.html` (light) / `HeaderDark.dc.html` (dark). App icon: `src/app/icon.png`, `apple-icon.png`.
 - npm (`package-lock.json`). Path alias `@/*` → `src/*`.
 
 ## Commands
@@ -27,7 +30,11 @@ and `/ffwc` are live; `/models` and `/explainability` are switched off (see Data
 
 ## Structure
 - `src/app/`: pages `/` (map), `/forecast`, `/models`, `/ffwc`, `/performance`, `/explainability`.
-  Pages are client components; selection is kept in the URL (`?station=…&h=…`, `/ffwc` also `&date=`).
+  Pages are client components; selection is kept in the URL (`?station=…&h=…`, `/ffwc` also `&issue=`),
+  on the map too (`router.replace`), and the sidebar carries `station`/`h` to every tab. Pages get the
+  station from `useSelectedStation(param)` (`src/lib/selectedStation.ts`): URL first, else the last
+  picked station (localStorage `station`), else the first station, so one station stays selected
+  across tabs, reloads and new browser tabs.
 - `src/components/`: charts (`ObservedPredictedChart`, `FfwcComparisonChart`,
   `ModelComparisonChart`, `ModelMetricsBarChart`, `ShapBarChart`), `BangladeshMap`,
   `Sidebar`, selects, cards, `StatusPill`, `SampleDataBadge`.
@@ -43,8 +50,15 @@ and `/ffwc` are live; `/models` and `/explainability` are switched off (see Data
 - Live (client-side fetch via hooks in `liveData.ts`): `station_status` (fetched once per page
   load), `observed_wl` (last 30 days) and `latest_forecasts` (`source='ours'`, 75 3-hourly steps).
 - Horizons map to the forecast step nearest to now + horizon (`forecastAt`).
+- Cache: every fetch in `liveData.ts` goes through `cached(key, fetcher)` (`src/lib/dataCache.ts`), which
+  keeps results in localStorage (`wlcache:v1:*`) for one data day (Dhaka date, turning over at 01:00
+  so the 23:50 nightly engine run has finished). So each query runs at most once a day per browser.
+  The key must include every query argument; results must be JSON (cache rows, not `Map`s). New
+  data written mid-day (manual admin-panel run) shows the next day. Bump `v1` if a cached shape changes.
 - `/ffwc`: issue days from RPC `comparison_issues`, the chosen day's forecasts (both sources) +
   readings, and matched error per lead day from RPC `comparison_skill` (aggregated in the DB).
+  Default issue = newest with `n_observed > 0` (at least one matched point). A station with no issue
+  days shows only a "choose another station" message (`NoIssues`), no chart or tables.
 - `/performance`: last 15 days, observed vs the forecast made N steps ahead (RPC `horizon_performance`)
   and error per horizon (RPC `horizon_skill`). Horizons are steps of our 3-hourly output (`HORIZON_STEP`),
   not wall-clock hours: 3h = step 1 = next day 06:00 after the issue day's 18:00 data.
@@ -55,7 +69,12 @@ and `/ffwc` are live; `/models` and `/explainability` are switched off (see Data
 
 ## Conventions
 - Station ids are FFWC WL codes (`SW7.5`), the same as backend `stations.id`.
-- Colors come from CSS variables in `src/app/globals.css` (`--status-*`, `--cluster-*`).
+- Colors come from CSS variables in `src/app/globals.css` (`--status-*`, `--cluster-*`, `--series-ffwc`,
+  `--logo-*`). Don't hard-code colours: every variable has a dark value under `.dark`.
+- Dark mode: `dark` class on `<html>`, set before paint by the inline script in `app/layout.tsx` (saved
+  choice in localStorage `theme`, else the system setting) and toggled by `ThemeToggle` (sidebar footer,
+  mobile top bar). Tailwind `dark:` variant works. The generated basemap is recoloured by
+  `.dark .basemap [fill="…"]` rules in `globals.css`; add a rule there if the basemap gains a colour.
 - Responsive at Tailwind `lg` (1024px): below it the sidebar is a top bar + drawer (`Sidebar.tsx`), the map
   page stacks map over panel (panel is sticky only at `lg`), KPI cards wrap two per row. Wide tables get
   `overflow-x-auto`. Keep new pages free of horizontal overflow at 390px wide.
