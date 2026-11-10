@@ -58,11 +58,9 @@ function client() {
 }
 
 // ---- queries ---------------------------------------------------------------
-let statusPromise: Promise<Map<string, StationLive>> | null = null;
-
-/** All tracked stations' status, fetched once per data day (rows cached, see dataCache.ts). */
+/** All tracked stations' status (rows cached until the DB has new data, see dataCache.ts). */
 export function fetchStationStatus(): Promise<Map<string, StationLive>> {
-  statusPromise ??= cached("status", async () => {
+  return cached("status", async () => {
     const { data, error } = await client()
       .from("station_status")
       .select(
@@ -71,8 +69,6 @@ export function fetchStationStatus(): Promise<Map<string, StationLive>> {
     if (error) throw new Error(error.message);
     return data as StationLive[];
   }).then((rows) => new Map(rows.map((row) => [row.id, row])));
-  statusPromise.catch(() => (statusPromise = null)); // allow a retry after a failure
-  return statusPromise;
 }
 
 export function fetchStationDetail(stationId: string): Promise<StationDetail> {

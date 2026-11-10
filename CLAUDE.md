@@ -52,10 +52,12 @@ and `/ffwc` are live; `/models` and `/explainability` are switched off (see Data
   load), `observed_wl` (last 30 days) and `latest_forecasts` (`source='ours'`, 75 3-hourly steps).
 - Horizons map to the forecast step nearest to now + horizon (`forecastAt`).
 - Cache: every fetch in `liveData.ts` goes through `cached(key, fetcher)` (`src/lib/dataCache.ts`), which
-  keeps results in localStorage (`wlcache:v1:*`) for one data day (Dhaka date, turning over at 01:00
-  so the 23:50 nightly engine run has finished). So each query runs at most once a day per browser.
-  The key must include every query argument; results must be JSON (cache rows, not `Map`s). New
-  data written mid-day (manual admin-panel run) shows the next day. Bump `v1` if a cached shape changes.
+  keeps results in localStorage (`wlcache:v2:*`) until the database has new data. On page load (and
+  every 5 min in an open tab) it calls RPC `data_stamp()` (newest `observed_wl.obs_time`,
+  `forecasts.created_at`, `stations.updated_at`); a different stamp clears the cache, the same stamp
+  serves from it. If the stamp call fails the old cache stays in use. So new data, including a manual
+  admin-panel run, shows on the next load. The key must include every query argument; results must be
+  JSON (cache rows, not `Map`s). Bump `v2` if a cached shape changes.
 - `/ffwc`: issue days from RPC `comparison_issues`, the chosen day's forecasts (both sources) +
   readings, and matched error per lead day from RPC `comparison_skill` (aggregated in the DB).
   Default issue = newest with `n_observed > 0` (at least one matched point). A station with no issue
