@@ -9,6 +9,8 @@ It shows observed and forecast river water levels for 25 Bangladesh Water Develo
 (BWDB) gauge stations on a map, with 15-day forecasts and comparisons against the official
 forecasts of the Flood Forecasting and Warning Centre (FFWC).
 
+**Live site: <https://bonna-bd.vercel.app/>**
+
 ## Overview
 
 Bangladesh lies downstream of the Ganges-Brahmaputra-Meghna basin, and timely water-level
@@ -25,7 +27,7 @@ RMSE 0.521 m, against XGBoost, Vanilla LSTM, GRU and TCN). This website is the t
 web-based visualization step: it puts the live forecasts in front of users.
 
 The forecasts are produced by the local engine in the backend repo
-([`CFL_ED_LSTM_FF_Backend`](../CFL_ED_LSTM_FF_Backend/flood-engine/README.md)), which scrapes FFWC,
+([`CFL_ED_LSTM_FF_Backend`](../CFL_ED_LSTM_FF_Backend/README.md)), which scrapes FFWC,
 runs the model every night and writes the results to Supabase. This site only reads them.
 
 ## Features
@@ -118,7 +120,8 @@ npm run lint     # ESLint
 
 ### Deploying
 
-Any static-friendly Next.js host works (for example Vercel's free plan). Set the two
+The site is hosted on Vercel's free plan at <https://bonna-bd.vercel.app/>. Any Next.js host
+works the same way: set the two
 `NEXT_PUBLIC_*` variables in the host's settings before building: their values are written into
 the build.
 
